@@ -13,13 +13,18 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const wdfpData_1 = require("../../data/wdfpData");
+const shopPurchase_1 = require("../../data/domains/shopPurchase");
+const equipment_1 = require("../../data/domains/equipment");
+const item_1 = require("../../data/domains/item");
+const player_1 = require("../../data/domains/player");
+const session_1 = require("../../data/domains/session");
 const activeAccount_1 = require("../../data/activeAccount");
 const assets_1 = require("../../lib/assets");
 const types_1 = require("../../lib/types");
 const utils_1 = require("../../utils");
 const quest_1 = require("../../lib/quest");
-const equipment_1 = require("../../lib/equipment");
+const stamina_1 = require("../../lib/stamina");
+const equipment_2 = require("../../lib/equipment");
 const cdn_general_shop_whitelist_json_1 = __importDefault(require("../../../assets/cdn_general_shop_whitelist.json"));
 const GENERAL_SHOP_CDN_KEYS = new Set(cdn_general_shop_whitelist_json_1.default);
 function buildEnhancementSalesList(playerId, items) {
@@ -44,8 +49,8 @@ function buildEnhancementSalesList(playerId, items) {
         // Sort by stage ascending
         group.items.sort((a, b) => a.stage - b.stage);
         const equipmentId = group.equipmentId;
-        const enhancementLevel = (0, wdfpData_1.playerOwnsEquipmentSync)(playerId, equipmentId)
-            ? ((_e = (_d = (0, wdfpData_1.getPlayerEquipmentSync)(playerId, equipmentId)) === null || _d === void 0 ? void 0 : _d.enhancementLevel) !== null && _e !== void 0 ? _e : 0)
+        const enhancementLevel = (0, equipment_1.playerOwnsEquipmentSync)(playerId, equipmentId)
+            ? ((_e = (_d = (0, equipment_1.getPlayerEquipmentSync)(playerId, equipmentId)) === null || _d === void 0 ? void 0 : _d.enhancementLevel) !== null && _e !== void 0 ? _e : 0)
             : -1;
         // Find target product: first item with enhancementMaxLevel > current enhancementLevel
         let targetItem = null;
@@ -109,7 +114,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "message": "Invalid request body."
             });
         const purchaseAmount = Math.max(1, rawPurchaseAmount);
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -117,7 +122,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             });
         // get player
         const playerId = (0, activeAccount_1.resolvePlayerIdSync)(viewerIdSession.accountId);
-        const player = playerId !== null ? (0, wdfpData_1.getPlayerSync)(playerId) : null;
+        const player = playerId !== null ? (0, player_1.getPlayerSync)(playerId) : null;
         if (player === null)
             return reply.status(500).send({
                 "error": "Internal Server Error",
@@ -132,7 +137,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             });
         // validate stock limit
         if (shopItemData.stock !== undefined && shopItemData.stock > 0) {
-            const purchased = (0, wdfpData_1.getPlayerShopPurchaseCountSync)(playerId, shopItemId);
+            const purchased = (0, shopPurchase_1.getPlayerShopPurchaseCountSync)(playerId, shopItemId);
             if (purchased + purchaseAmount > shopItemData.stock) {
                 return reply.status(400).send({
                     "error": "Bad Request",
@@ -179,7 +184,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         {
             for (const cost of shopItemData.costs) {
                 const itemId = cost.id;
-                const itemAmount = (_a = (0, wdfpData_1.getPlayerItemSync)(playerId, itemId)) !== null && _a !== void 0 ? _a : 0;
+                const itemAmount = (_a = (0, item_1.getPlayerItemSync)(playerId, itemId)) !== null && _a !== void 0 ? _a : 0;
                 const newItemAmount = itemAmount - (cost.amount * purchaseAmount);
                 if (0 > newItemAmount)
                     return reply.status(400).send({
@@ -190,11 +195,11 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             }
             // deduct cost item
             for (const [itemId, newAmount] of Object.entries(itemList)) {
-                (0, wdfpData_1.updatePlayerItemSync)(playerId, itemId, newAmount);
+                (0, item_1.updatePlayerItemSync)(playerId, itemId, newAmount);
             }
         }
         // update player
-        (0, wdfpData_1.updatePlayerSync)({
+        (0, player_1.updatePlayerSync)({
             id: playerId,
             freeMana: freeMana,
             freeVmoney: freeVmoney,
@@ -209,7 +214,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                     "error": "Bad Request",
                     "message": "Enhancement item missing equipment_id or target level."
                 });
-            const currentEquipment = (0, wdfpData_1.getPlayerEquipmentSync)(playerId, equipmentId);
+            const currentEquipment = (0, equipment_1.getPlayerEquipmentSync)(playerId, equipmentId);
             if (currentEquipment === null)
                 return reply.status(400).send({
                     "error": "Bad Request",
@@ -217,11 +222,11 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 });
             // Update to target enhancement level
             const newLevel = Math.max(currentEquipment.enhancementLevel, targetLevel);
-            (0, wdfpData_1.updatePlayerEquipmentSync)(playerId, equipmentId, { enhancementLevel: newLevel });
+            (0, equipment_1.updatePlayerEquipmentSync)(playerId, equipmentId, { enhancementLevel: newLevel });
             currentEquipment.enhancementLevel = newLevel;
             // Record purchase
             for (let i = 0; i < purchaseAmount; i++) {
-                (0, wdfpData_1.addPlayerShopPurchaseSync)(playerId, shopItemId);
+                (0, shopPurchase_1.addPlayerShopPurchaseSync)(playerId, shopItemId);
             }
             reply.header("content-type", "application/x-msgpack");
             return reply.status(200).send({
@@ -235,7 +240,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                         "bond_token": bondTokens
                     },
                     "character_list": [],
-                    "equipment_list": [(0, equipment_1.clientSerializeEquipment)(equipmentId, currentEquipment)],
+                    "equipment_list": [(0, equipment_2.clientSerializeEquipment)(equipmentId, currentEquipment)],
                     "item_list": itemList,
                     "mail_arrived": false
                 }
@@ -300,10 +305,10 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         const rewardResult = (0, quest_1.givePlayerRewardsSync)(playerId, rewards);
         // record purchase for stock tracking
         for (let i = 0; i < purchaseAmount; i++) {
-            (0, wdfpData_1.addPlayerShopPurchaseSync)(playerId, shopItemId);
+            (0, shopPurchase_1.addPlayerShopPurchaseSync)(playerId, shopItemId);
         }
         // verify DB write
-        const afterPlayer = (0, wdfpData_1.getPlayerSync)(playerId);
+        const afterPlayer = (0, player_1.getPlayerSync)(playerId);
         console.log(`[shop:buy] after DB freeMana=${afterPlayer.freeMana} freeVmoney=${afterPlayer.freeVmoney} rewardItems=${JSON.stringify((_b = rewardResult === null || rewardResult === void 0 ? void 0 : rewardResult.items) !== null && _b !== void 0 ? _b : {})}`);
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({
@@ -337,7 +342,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Bad Request",
                 "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -376,7 +381,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         // parse shop items
         const salesList = [];
         // Load purchase history for stock tracking
-        const purchasedMap = (0, wdfpData_1.getPlayerShopPurchasesMapSync)(playerId);
+        const purchasedMap = (0, shopPurchase_1.getPlayerShopPurchasesMapSync)(playerId);
         const totalPurchased = Object.values(purchasedMap).reduce((a, b) => a + b, 0);
         console.log(`[shop:get_sales] player=${playerId} purchasedKeys=${Object.keys(purchasedMap).length} totalPurchased=${totalPurchased}`);
         let filteredCdnCount = 0;
@@ -463,7 +468,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Bad Request", "message": "Invalid viewer_id."
             });
         }
-        const session = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const session = yield (0, session_1.getSession)(viewerId.toString());
         if (!session)
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid viewer id."
@@ -473,7 +478,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             return reply.status(500).send({
                 "error": "Internal Server Error", "message": "No player bound to account."
             });
-        const player = (0, wdfpData_1.getPlayerSync)(playerId);
+        const player = (0, player_1.getPlayerSync)(playerId);
         if (!player)
             return reply.status(500).send({
                 "error": "Internal Server Error", "message": "Player not found."
@@ -481,13 +486,8 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         const config = (0, assets_1.getConfigSync)();
         const recoveryCost = config.stamina_recovery_virtual_money;
         const recoveryValue = config.stamina_recovery_value;
-        const recoverySeconds = config.stamina_recovery_seconds;
         const maxOverflow = config.max_stamina_overflow;
-        // Compute real-time stamina using client formula
-        const staminaHealTimeSec = player.staminaHealTime.getTime() / 1000;
-        const nowSec = Math.floor(Date.now() / 1000);
-        const elapsed = (nowSec - staminaHealTimeSec) / recoverySeconds;
-        const currentStamina = Math.min(Math.max(0, player.stamina + Math.floor(elapsed)), maxOverflow);
+        const currentStamina = (0, stamina_1.computeRealTimeStamina)(player);
         // Already at max
         if (currentStamina >= maxOverflow) {
             console.log(`[RECOVER-STAMINA] player ${playerId} already at max (${currentStamina} >= ${maxOverflow})`);
@@ -510,7 +510,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         // Calculate recovery amount (capped at overflow)
         const afterStamina = Math.min(currentStamina + recoveryValue, maxOverflow);
         const actualRecovery = afterStamina - currentStamina;
-        (0, wdfpData_1.updatePlayerSync)({
+        (0, player_1.updatePlayerSync)({
             id: playerId,
             stamina: afterStamina,
             staminaHealTime: new Date(),
@@ -523,7 +523,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             "data": {
                 "user_info": {
                     "stamina": afterStamina,
-                    "stamina_heal_time": (0, utils_1.getServerTime)(),
+                    "stamina_heal_time": (0, utils_1.realToVirtual)(new Date()),
                     "free_vmoney": freeVmoney - recoveryCost
                 }
             }

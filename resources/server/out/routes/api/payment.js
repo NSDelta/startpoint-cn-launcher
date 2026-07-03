@@ -14,7 +14,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const wdfpData_1 = require("../../data/wdfpData");
+const player_1 = require("../../data/domains/player");
+const session_1 = require("../../data/domains/session");
 const activeAccount_1 = require("../../data/activeAccount");
 const utils_1 = require("../../utils");
 const assets_1 = require("../../lib/assets");
@@ -30,7 +31,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid request body."
             });
-        const session = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const session = yield (0, session_1.getSession)(viewerId.toString());
         if (!session)
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid viewer id."
@@ -59,7 +60,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "data": {}
             });
         }
-        const session = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const session = yield (0, session_1.getSession)(viewerId.toString());
         if (!session) {
             reply.header("content-type", "application/x-msgpack");
             return reply.status(200).send({
@@ -97,7 +98,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "data": {}
             });
         }
-        const session = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const session = yield (0, session_1.getSession)(viewerId.toString());
         if (!session) {
             reply.header("content-type", "application/x-msgpack");
             return reply.status(200).send({
@@ -108,7 +109,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         const playerId = (0, activeAccount_1.resolvePlayerIdSync)(session.accountId);
         if (!playerId)
             return reply.status(500).send({ "error": "Internal Server Error", "message": "No player bound to account." });
-        const player = (0, wdfpData_1.getPlayerSync)(playerId);
+        const player = (0, player_1.getPlayerSync)(playerId);
         if (!player)
             return reply.status(500).send({ "error": "Internal Server Error", "message": "Player not found." });
         // Determine product_id from pending payment
@@ -131,7 +132,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         const maxVmoney = config.max_virtual_money;
         const afterPaid = Math.min(player.vmoney + paidVmoney, maxVmoney);
         const afterFree = Math.min(player.freeVmoney + freeVmoney, maxVmoney);
-        (0, wdfpData_1.updatePlayerSync)({
+        (0, player_1.updatePlayerSync)({
             id: playerId,
             vmoney: afterPaid,
             freeVmoney: afterFree

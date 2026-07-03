@@ -10,7 +10,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const types_1 = require("../data/types");
-const wdfpData_1 = require("../data/wdfpData");
+const session_1 = require("../data/domains/session");
+const account_1 = require("../data/domains/account");
 const utils_1 = require("../utils");
 const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
     fastify.post("/v3/util/country/get", (_, reply) => {
@@ -33,17 +34,17 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Bad Request",
                 "message": "Invalid request body."
             });
-        let session = yield (0, wdfpData_1.getSession)(clientZat);
+        let session = yield (0, session_1.getSession)(clientZat);
         if (session === null) {
             // attempt to generate a new session
             const idpAlias = (0, utils_1.generateIdpAlias)(body.appId, body.deviceId, body.os);
             const accountId = Number.parseInt(body.playerId);
-            const account = isNaN(accountId) ? null : yield (0, wdfpData_1.getAccount)(accountId);
+            const account = isNaN(accountId) ? null : yield (0, account_1.getAccount)(accountId);
             if (account && account.idpAlias === idpAlias) {
                 // delete old session
-                yield (0, wdfpData_1.deleteAccountSessionsOfType)(account.id, types_1.SessionType.ZAT);
+                yield (0, session_1.deleteAccountSessionsOfType)(account.id, types_1.SessionType.ZAT);
                 // generate new zat session
-                session = yield (0, wdfpData_1.insertSession)({
+                session = yield (0, session_1.insertSession)({
                     expires: new Date(new Date().getTime() + 43200000),
                     accountId: account.id,
                     type: types_1.SessionType.ZAT
@@ -56,7 +57,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "message": "Invalid zat provided."
             });
         // get the Account assigned to the session
-        const account = yield (0, wdfpData_1.updateAccount)({
+        const account = yield (0, account_1.updateAccount)({
             id: session.accountId,
             lastLoginTime: new Date()
         })
@@ -71,8 +72,8 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         if (!account)
             return;
         // create new zat session
-        yield (0, wdfpData_1.deleteSession)(session.token);
-        const newSession = yield (0, wdfpData_1.insertSession)({
+        yield (0, session_1.deleteSession)(session.token);
+        const newSession = yield (0, session_1.insertSession)({
             expires: new Date(new Date().getTime() + 43200000),
             accountId: account.id,
             type: types_1.SessionType.ZAT
@@ -168,8 +169,8 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         const idpAlias = (0, utils_1.generateIdpAlias)(appId, deviceId, serialNo);
         const idpId = body.whiteKey;
         // create account
-        const existingAccount = accountId === undefined ? (0, wdfpData_1.getAccountFromIdpIdSync)(idpId) : yield (0, wdfpData_1.getAccount)(accountId);
-        const account = existingAccount === null ? yield (0, wdfpData_1.insertAccount)({
+        const existingAccount = accountId === undefined ? (0, account_1.getAccountFromIdpIdSync)(idpId) : yield (0, account_1.getAccount)(accountId);
+        const account = existingAccount === null ? yield (0, account_1.insertAccount)({
             appId: body.appId,
             idpAlias: idpAlias,
             idpCode: "zd3",
@@ -183,21 +184,21 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             });
         if (accountId) {
             // delete all previous sessions
-            yield (0, wdfpData_1.deleteAccountSessionsOfType)(accountId, types_1.SessionType.ZAT);
-            yield (0, wdfpData_1.deleteAccountSessionsOfType)(accountId, types_1.SessionType.ZRT);
+            yield (0, session_1.deleteAccountSessionsOfType)(accountId, types_1.SessionType.ZAT);
+            yield (0, session_1.deleteAccountSessionsOfType)(accountId, types_1.SessionType.ZRT);
         }
         if (existingAccount === null || existingAccount.idpAlias !== idpAlias) {
-            yield (0, wdfpData_1.updateAccount)({
+            yield (0, account_1.updateAccount)({
                 id: account.id,
                 idpAlias: idpAlias
             });
         }
-        const zatToken = yield (0, wdfpData_1.insertSession)({
+        const zatToken = yield (0, session_1.insertSession)({
             expires: new Date(new Date().getTime() + 43200000),
             accountId: account.id,
             type: types_1.SessionType.ZAT
         });
-        const zrtToken = yield (0, wdfpData_1.insertSession)({
+        const zrtToken = yield (0, session_1.insertSession)({
             expires: new Date(new Date().getTime() + 2592000000),
             accountId: account.id,
             type: types_1.SessionType.ZRT

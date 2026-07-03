@@ -9,8 +9,11 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const wdfpData_1 = require("../../data/wdfpData");
-const wdfpData_2 = require("../../data/wdfpData");
+const mail_1 = require("../../data/domains/mail");
+const character_1 = require("../../data/domains/character");
+const item_1 = require("../../data/domains/item");
+const player_1 = require("../../data/domains/player");
+const session_1 = require("../../data/domains/session");
 const activeAccount_1 = require("../../data/activeAccount");
 const utils_1 = require("../../utils");
 const utils_2 = require("../../data/utils");
@@ -31,8 +34,8 @@ function formatMailResponse(mail) {
     };
 }
 function applyMailReward(playerId, mail) {
-    var _a, _b;
-    const player = (0, wdfpData_1.getPlayerSync)(playerId);
+    var _a, _b, _c;
+    const player = (0, player_1.getPlayerSync)(playerId);
     const characterList = [];
     const equipmentList = [];
     const itemList = {};
@@ -40,38 +43,38 @@ function applyMailReward(playerId, mail) {
     if (!player)
         return { characterList, equipmentList, itemList, userInfo };
     switch (mail.type) {
-        case wdfpData_1.MailType.ITEM: {
+        case mail_1.MailType.ITEM: {
             if (mail.type_id === null)
                 break;
-            const newAmount = (0, wdfpData_2.givePlayerItemSync)(playerId, mail.type_id, mail.number);
+            const newAmount = (0, item_1.givePlayerItemSync)(playerId, mail.type_id, mail.number);
             itemList[String(mail.type_id)] = newAmount;
             break;
         }
-        case wdfpData_1.MailType.PAID_VMONEY: {
+        case mail_1.MailType.PAID_VMONEY: {
             const newVmoney = player.vmoney + mail.number;
-            (0, wdfpData_1.updatePlayerSync)({ id: playerId, vmoney: newVmoney });
+            (0, player_1.updatePlayerSync)({ id: playerId, vmoney: newVmoney });
             userInfo['vmoney'] = newVmoney;
             break;
         }
-        case wdfpData_1.MailType.FREE_VMONEY: {
+        case mail_1.MailType.FREE_VMONEY: {
             const newFreeVmoney = player.freeVmoney + mail.number;
-            (0, wdfpData_1.updatePlayerSync)({ id: playerId, freeVmoney: newFreeVmoney });
+            (0, player_1.updatePlayerSync)({ id: playerId, freeVmoney: newFreeVmoney });
             userInfo['free_vmoney'] = newFreeVmoney;
             break;
         }
-        case wdfpData_1.MailType.CHARACTER: {
+        case mail_1.MailType.CHARACTER: {
             if (mail.type_id === null)
                 break;
-            const existing = (0, wdfpData_2.getPlayerCharacterSync)(playerId, mail.type_id);
+            const existing = (0, character_1.getPlayerCharacterSync)(playerId, mail.type_id);
             if (existing) {
-                (0, wdfpData_2.updatePlayerCharacterSync)(playerId, mail.type_id, {
+                (0, character_1.updatePlayerCharacterSync)(playerId, mail.type_id, {
                     entryCount: existing.entryCount + 1
                 });
             }
             else {
-                (0, wdfpData_1.insertDefaultPlayerCharacterSync)(playerId, mail.type_id);
+                (0, character_1.insertDefaultPlayerCharacterSync)(playerId, mail.type_id);
             }
-            const charData = (0, wdfpData_2.getPlayerCharacterSync)(playerId, mail.type_id);
+            const charData = (0, character_1.getPlayerCharacterSync)(playerId, mail.type_id);
             characterList.push({
                 character_id: mail.type_id,
                 entry_count: charData.entryCount,
@@ -89,57 +92,57 @@ function applyMailReward(playerId, mail) {
             });
             break;
         }
-        case wdfpData_1.MailType.EQUIPMENT: {
+        case mail_1.MailType.EQUIPMENT: {
             if (mail.type_id === null)
                 break;
             const result = (0, equipment_1.givePlayerEquipmentSync)(playerId, mail.type_id, mail.number);
             equipmentList.push(result);
             break;
         }
-        case wdfpData_1.MailType.STAR_CRUMB: {
+        case mail_1.MailType.STAR_CRUMB: {
             const newCrumb = player.starCrumb + mail.number;
-            (0, wdfpData_1.updatePlayerSync)({ id: playerId, starCrumb: newCrumb });
+            (0, player_1.updatePlayerSync)({ id: playerId, starCrumb: newCrumb });
             userInfo['star_crumb'] = newCrumb;
             break;
         }
-        case wdfpData_1.MailType.FREE_MANA: {
+        case mail_1.MailType.FREE_MANA: {
             const newMana = player.freeMana + mail.number;
-            (0, wdfpData_1.updatePlayerSync)({ id: playerId, freeMana: newMana });
+            (0, player_1.updatePlayerSync)({ id: playerId, freeMana: newMana, totalManaObtained: ((_c = player.totalManaObtained) !== null && _c !== void 0 ? _c : 0) + mail.number });
             userInfo['free_mana'] = newMana;
             break;
         }
-        case wdfpData_1.MailType.EXP_POOL: {
+        case mail_1.MailType.EXP_POOL: {
             const newExp = player.expPool + mail.number;
-            (0, wdfpData_1.updatePlayerSync)({ id: playerId, expPool: newExp });
+            (0, player_1.updatePlayerSync)({ id: playerId, expPool: newExp });
             userInfo['exp_pool'] = newExp;
             break;
         }
-        case wdfpData_1.MailType.BOND_TOKEN: {
+        case mail_1.MailType.BOND_TOKEN: {
             const newBond = player.bondToken + mail.number;
-            (0, wdfpData_1.updatePlayerSync)({ id: playerId, bondToken: newBond });
+            (0, player_1.updatePlayerSync)({ id: playerId, bondToken: newBond });
             userInfo['bond_token'] = newBond;
             break;
         }
-        case wdfpData_1.MailType.BOSS_BOOST_POINT: {
+        case mail_1.MailType.BOSS_BOOST_POINT: {
             const newBoss = player.bossBoostPoint + mail.number;
-            (0, wdfpData_1.updatePlayerSync)({ id: playerId, bossBoostPoint: newBoss });
+            (0, player_1.updatePlayerSync)({ id: playerId, bossBoostPoint: newBoss });
             userInfo['boss_boost_point'] = newBoss;
             break;
         }
-        case wdfpData_1.MailType.BOOST_POINT: {
+        case mail_1.MailType.BOOST_POINT: {
             const newBoost = player.boostPoint + mail.number;
-            (0, wdfpData_1.updatePlayerSync)({ id: playerId, boostPoint: newBoost });
+            (0, player_1.updatePlayerSync)({ id: playerId, boostPoint: newBoost });
             userInfo['boost_point'] = newBoost;
             break;
         }
-        case wdfpData_1.MailType.RANK_POINT: {
+        case mail_1.MailType.RANK_POINT: {
             const newRank = player.rankPoint + mail.number;
-            (0, wdfpData_1.updatePlayerSync)({ id: playerId, rankPoint: newRank });
+            (0, player_1.updatePlayerSync)({ id: playerId, rankPoint: newRank });
             userInfo['rank_point'] = newRank;
             break;
         }
     }
-    (0, wdfpData_1.insertReceiveHistorySync)(playerId, { type: mail.type, type_id: mail.type_id, number: mail.number });
+    (0, mail_1.insertReceiveHistorySync)(playerId, { type: mail.type, type_id: mail.type_id, number: mail.number });
     return { characterList, equipmentList, itemList, userInfo };
 }
 const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
@@ -151,7 +154,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 error: "Bad Request",
                 message: "Invalid viewer_id"
             });
-        const session = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const session = yield (0, session_1.getSession)(viewerId.toString());
         if (!session)
             return reply.status(400).send({
                 error: "Bad Request",
@@ -164,8 +167,8 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 message: "No player bound to account"
             });
         const page = body.current_page || 1;
-        const mails = (0, wdfpData_1.getPlayerMailsSync)(playerId, page, 100);
-        const totalCount = (0, wdfpData_1.getPlayerMailCountSync)(playerId);
+        const mails = (0, mail_1.getPlayerMailsSync)(playerId, page, 100);
+        const totalCount = (0, mail_1.getPlayerMailCountSync)(playerId);
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({
             data_headers: (0, utils_1.generateDataHeaders)({ viewer_id: viewerId }),
@@ -184,7 +187,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 error: "Bad Request",
                 message: "Invalid request body"
             });
-        const session = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const session = yield (0, session_1.getSession)(viewerId.toString());
         if (!session)
             return reply.status(400).send({
                 error: "Bad Request",
@@ -197,7 +200,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 message: "No player bound to account"
             });
         // Read mail before claiming to get attachment info
-        const mails = (0, wdfpData_1.getPlayerMailsSync)(playerId, 1, 1000, true);
+        const mails = (0, mail_1.getPlayerMailsSync)(playerId, 1, 1000, true);
         const mail = mails.find(m => m.id === mailId);
         if (!mail)
             return reply.status(400).send({
@@ -207,13 +210,13 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         // Apply reward first
         const { characterList, equipmentList, itemList, userInfo } = applyMailReward(playerId, mail);
         // Then mark as received
-        (0, wdfpData_1.receiveMailSync)(playerId, mailId);
-        const totalCount = (0, wdfpData_1.getPlayerMailCountSync)(playerId);
+        (0, mail_1.receiveMailSync)(playerId, mailId);
+        const totalCount = (0, mail_1.getPlayerMailCountSync)(playerId);
         const responseData = {
             auto_sale_expired_mail: false,
             dispose_expired_mail: false,
             total_count: totalCount,
-            mail_arrived: (0, wdfpData_1.getPlayerMailCountSync)(playerId, true) > 0,
+            mail_arrived: (0, mail_1.getPlayerMailCountSync)(playerId, true) > 0,
         };
         if (characterList.length > 0)
             responseData.character_list = characterList;
@@ -238,7 +241,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 error: "Bad Request",
                 message: "Invalid request body"
             });
-        const session = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const session = yield (0, session_1.getSession)(viewerId.toString());
         if (!session)
             return reply.status(400).send({
                 error: "Bad Request",
@@ -251,7 +254,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 message: "No player bound to account"
             });
         // Get all unreceived mails
-        const unreceivedMails = (0, wdfpData_1.getPlayerMailsSync)(playerId, 1, 1000, true);
+        const unreceivedMails = (0, mail_1.getPlayerMailsSync)(playerId, 1, 1000, true);
         const mailMap = new Map(unreceivedMails.map(m => [m.id, m]));
         const alreadyCount = mailIds.filter(id => !mailMap.has(id)).length;
         const characterList = [];
@@ -269,7 +272,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             Object.assign(userInfo, ui);
         }
         // Mark all as received
-        const claimed = (0, wdfpData_1.receiveAllMailsSync)(playerId, mailIds.filter(id => mailMap.has(id)));
+        const claimed = (0, mail_1.receiveAllMailsSync)(playerId, mailIds.filter(id => mailMap.has(id)));
         const responseData = {
             already_mail_count: alreadyCount,
             auto_sale_expired_mail_count: 0,
@@ -279,8 +282,8 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             mail_ids: claimed,
             max_overed_mail_count: 0,
             outdated_mail_count: 0,
-            total_count: (0, wdfpData_1.getPlayerMailCountSync)(playerId),
-            mail_arrived: (0, wdfpData_1.getPlayerMailCountSync)(playerId, true) > 0,
+            total_count: (0, mail_1.getPlayerMailCountSync)(playerId),
+            mail_arrived: (0, mail_1.getPlayerMailCountSync)(playerId, true) > 0,
         };
         if (characterList.length > 0)
             responseData.character_list = characterList;

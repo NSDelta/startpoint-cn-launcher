@@ -13,15 +13,30 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.insertActiveQuest = exports.activeQuests = void 0;
-const wdfpData_1 = require("../../data/wdfpData");
+const quest_active_1 = require("../../data/domains/quest_active");
+const rushEvent_1 = require("../../data/domains/rushEvent");
+const player_1 = require("../../data/domains/player");
+const item_1 = require("../../data/domains/item");
+const quest_1 = require("../../data/domains/quest");
+const carnivalEvent_1 = require("../../data/domains/carnivalEvent");
 const assets_1 = require("../../lib/assets");
 const character_1 = require("../../lib/character");
-const quest_1 = require("../../lib/quest");
+const quest_2 = require("../../lib/quest");
 const types_1 = require("../../lib/types");
 const utils_1 = require("../../utils");
-const rushEvent_1 = require("./rushEvent");
-const types_2 = require("../../data/types");
-const activeAccount_1 = require("../../data/activeAccount");
+const rushEvent_2 = require("./rushEvent");
+const stamina_1 = require("../../lib/stamina");
+const stamina_cost_1 = require("../../lib/stamina-cost");
+const carnival_handler_1 = require("../../lib/quest/finish/carnival-handler");
+const rush_handler_1 = require("../../lib/quest/finish/rush-handler");
+const raid_handler_1 = require("../../lib/quest/finish/raid-handler");
+const quest_calc_1 = require("../../lib/quest/finish/quest-calc");
+const session_validator_1 = require("../../lib/quest/finish/session-validator");
+const challenge_point_1 = require("../../lib/quest/finish/challenge-point");
+const character_clear_tracker_1 = require("../../lib/quest/finish/character-clear-tracker");
+const powerflip_tracker_1 = require("../../lib/quest/finish/powerflip-tracker");
+const leader_powerflip_tracker_1 = require("../../lib/quest/finish/leader-powerflip-tracker");
+const party_co_clear_tracker_1 = require("../../lib/quest/finish/party-co-clear-tracker");
 const fs_1 = require("fs");
 const path_1 = __importDefault(require("path"));
 const quest_entry_costs_json_1 = __importDefault(require("../../../assets/quest_entry_costs.json"));
@@ -43,7 +58,7 @@ function insertActiveQuest(playerId, quest) {
     var _a, _b, _c;
     exports.activeQuests[playerId] = quest;
     // Persist to DB for battle recovery across server restarts
-    (0, wdfpData_1.insertPlayerActiveQuestSync)(playerId, {
+    (0, quest_active_1.insertPlayerActiveQuestSync)(playerId, {
         playerId,
         playId: quest.playId,
         questId: quest.questId,
@@ -61,28 +76,19 @@ function insertActiveQuest(playerId, quest) {
 exports.insertActiveQuest = insertActiveQuest;
 const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
     fastify.post("/finish", (request, reply) => __awaiter(void 0, void 0, void 0, function* () {
-        var _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w;
+        var _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t;
         const body = request.body;
         const viewerId = body.viewer_id;
         if (!viewerId || isNaN(viewerId))
             return reply.status(400).send({
-                "error": "Bad Request",
-                "message": "Invalid request body."
+                "error": "Bad Request", "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
-        if (!viewerIdSession)
+        const sessionResult = yield (0, session_validator_1.validateSessionAndPlayer)(viewerId);
+        if (!sessionResult)
             return reply.status(400).send({
-                "error": "Bad Request",
-                "message": "Invalid viewer id."
+                "error": "Bad Request", "message": "Invalid viewer id."
             });
-        // get player
-        const playerId = (0, activeAccount_1.resolvePlayerIdSync)(viewerIdSession.accountId);
-        const playerData = playerId !== null ? (0, wdfpData_1.getPlayerSync)(playerId) : null;
-        if (playerData === null)
-            return reply.status(500).send({
-                "error": "Internal Server Error",
-                "message": "No player bound to account."
-            });
+        const { playerId, playerData } = sessionResult;
         // get active quest data
         const activeQuestData = exports.activeQuests[playerId];
         console.log(`[FINISH] req: playerId=${playerId} questId=${body.quest_id} category=${body.category} activeExists=${activeQuestData !== undefined} multi=${(_b = activeQuestData === null || activeQuestData === void 0 ? void 0 : activeQuestData.isMulti) !== null && _b !== void 0 ? _b : false}`);
@@ -104,26 +110,22 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         }
         // delete the active quest data from global record
         delete exports.activeQuests[playerId];
-        (0, wdfpData_1.deletePlayerActiveQuestSync)(playerId);
-        // calculate clear rank (only if quest has rank time thresholds)
+        (0, quest_active_1.deletePlayerActiveQuestSync)(playerId);
+        // calculate clear rank
         const clearTime = body.elapsed_time_ms;
-        const hasRankThresholds = questData.bRankTime > 0;
-        const clearRank = hasRankThresholds ? (questData.sPlusRankTime >= clearTime ? 5
-            : questData.sRankTime >= clearTime ? 4
-                : questData.aRankTime >= clearTime ? 3
-                    : questData.bRankTime >= clearTime ? 2
-                        : 1) : null;
+        const clearRank = (0, quest_calc_1.calculateClearRank)(clearTime, questData);
         // calculate player rewards
         const newExpPool = playerData.expPool + questData.poolExpReward;
         const beforeRankPoint = playerData.rankPoint;
         const newRankPoint = beforeRankPoint + questData.rankPointReward;
         let newMana = playerData.freeMana + questData.manaReward + body.add_mana;
+        const manaObtained = questData.manaReward + body.add_mana;
         // calculate boost point
         let newBoostPoint = playerData.boostPoint - (activeQuestData.useBoostPoint ? 1 : 0);
         let newBossBoostPoint = playerData.bossBoostPoint - (activeQuestData.useBossBoostPoint ? 1 : 0);
         let useBoostPoint = (activeQuestData.useBoostPoint && (newBoostPoint >= 0)) || (activeQuestData.useBossBoostPoint && (newBossBoostPoint >= 0));
         // check current quest progress
-        const questProgress = (0, wdfpData_1.getPlayerSingleQuestProgressSync)(playerId, questCategory, questId);
+        const questProgress = (0, quest_1.getPlayerSingleQuestProgressSync)(playerId, questCategory, questId);
         const questPreviouslyCompleted = questProgress !== null;
         // Score attack: accomplished determined by border reward minimum tier (from CDN)
         let questAccomplished = body.is_accomplished;
@@ -137,8 +139,9 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 }
             }
         }
-        const clearReward = !questPreviouslyCompleted && questData.clearReward !== undefined ? (0, quest_1.givePlayerRewardSync)(playerId, questData.clearReward) : null;
-        const sPlusClearReward = (clearRank === 5) && ((questProgress === null || questProgress === void 0 ? void 0 : questProgress.clearRank) !== 5) && (questData.sPlusReward !== undefined) ? (0, quest_1.givePlayerRewardSync)(playerId, questData.sPlusReward) : null;
+        const clearReward = !questPreviouslyCompleted && questData.clearReward !== undefined ? (0, quest_2.givePlayerRewardSync)(playerId, questData.clearReward) : null;
+        const sPlusClearReward = (clearRank === 5) && ((questProgress === null || questProgress === void 0 ? void 0 : questProgress.clearRank) !== 5) && (questData.sPlusReward !== undefined) ? (0, quest_2.givePlayerRewardSync)(playerId, questData.sPlusReward) : null;
+        const leaderId = (_c = body.statistics.party.characters[0]) === null || _c === void 0 ? void 0 : _c.id;
         if (questAccomplished) {
             // update quest progress
             if (questPreviouslyCompleted) {
@@ -147,12 +150,13 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                     questId: questId,
                     finished: true,
                     bestElapsedTimeMs: questProgress.bestElapsedTimeMs === undefined || questProgress.bestElapsedTimeMs === null ? clearTime : Math.min(clearTime, questProgress.bestElapsedTimeMs),
-                    highScore: questProgress.highScore === undefined ? body.score : Math.max(body.score, questProgress.highScore)
+                    highScore: questProgress.highScore === undefined ? body.score : Math.max(body.score, questProgress.highScore),
+                    leaderCharacterId: leaderId !== null && leaderId !== void 0 ? leaderId : null
                 };
                 if (clearRank !== null) {
                     updateData.clearRank = questProgress.clearRank === undefined ? clearRank : Math.max(clearRank, questProgress.clearRank);
                 }
-                (0, wdfpData_1.updatePlayerQuestProgressSync)(playerId, questCategory, updateData);
+                (0, quest_1.updatePlayerQuestProgressSync)(playerId, questCategory, updateData);
             }
             else {
                 // insert if it doesn't already exist.
@@ -161,50 +165,38 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                     finished: true,
                     bestElapsedTimeMs: clearTime,
                     highScore: body.score,
-                    clearRank: clearRank !== null && clearRank !== void 0 ? clearRank : 5 // default S+ for quests without rank thresholds
+                    clearRank: clearRank !== null && clearRank !== void 0 ? clearRank : 5,
+                    leaderCharacterId: leaderId !== null && leaderId !== void 0 ? leaderId : null
                 };
-                (0, wdfpData_1.insertPlayerQuestProgressSync)(playerId, questCategory, insertData);
+                (0, quest_1.insertPlayerQuestProgressSync)(playerId, questCategory, insertData);
             }
         }
         // update player
-        (0, wdfpData_1.updatePlayerSync)({
-            id: playerId,
-            freeMana: newMana,
-            expPool: newExpPool,
-            rankPoint: newRankPoint,
-            boostPoint: newBoostPoint,
-            bossBoostPoint: newBossBoostPoint
-        });
-        // Consume daily challenge point
-        let dailyChallengePointList = null;
-        if (questCategory === types_1.QuestCategory.EXPERT_SINGLE_EVENT && questData.eventId) {
-            const cpKey = `expert_${questData.eventId}`;
-            const challengePointId = event_challenge_point_map_json_1.default[cpKey];
-            if (challengePointId) {
-                const entries = (0, wdfpData_1.getPlayerDailyChallengePointListSync)(playerId);
-                const entry = entries.find(e => e.id === challengePointId);
-                if (entry && entry.point > 0) {
-                    (0, wdfpData_1.updatePlayerDailyChallengePointSync)(playerId, challengePointId, entry.point - 1);
-                    console.log(`[BATTLE] challengePoint consumed: id=${challengePointId} old=${entry.point} new=${entry.point - 1}`);
-                }
-                // Serialize for response
-                dailyChallengePointList = entries.map(e => ({
-                    "id": e.id,
-                    "point": e.id === challengePointId ? Math.max(0, e.point - 1) : e.point,
-                    "campaign_list": e.campaignList.map(c => ({
-                        "campaign_id": c.campaignId,
-                        "additional_point": c.additionalPoint
-                    }))
-                }));
-            }
+        const oldRkDegree = (0, stamina_1.getRankDegree)(beforeRankPoint);
+        const newDegreeId = (0, stamina_1.getRankDegree)(newRankPoint);
+        const didLevelUp = newDegreeId > oldRkDegree;
+        (0, player_1.updatePlayerSync)(Object.assign({ id: playerId, freeMana: newMana, expPool: newExpPool, rankPoint: newRankPoint, boostPoint: newBoostPoint, bossBoostPoint: newBossBoostPoint, totalManaObtained: ((_d = playerData.totalManaObtained) !== null && _d !== void 0 ? _d : 0) + manaObtained, maxComboAchieved: Math.max((_e = playerData.maxComboAchieved) !== null && _e !== void 0 ? _e : 0, (_g = (_f = body.statistics) === null || _f === void 0 ? void 0 : _f.max_combo_count) !== null && _g !== void 0 ? _g : 0) }, (didLevelUp ? { stamina: playerData.stamina + (0, stamina_1.getMaxStamina)(newDegreeId), staminaHealTime: new Date() } : {})));
+        if (didLevelUp) {
+            playerData.stamina = playerData.stamina + (0, stamina_1.getMaxStamina)(newDegreeId);
+            playerData.staminaHealTime = new Date();
+            console.log(`[BATTLE-FINISH] player ${playerId} leveled up: ${oldRkDegree} -> ${newDegreeId}, stamina refilled`);
         }
+        // Consume daily challenge point
+        const dailyChallengePointList = (0, challenge_point_1.handleDailyChallengePoint)({
+            questCategory,
+            eventId: questData.eventId,
+            playerId,
+            challengePointMap: event_challenge_point_map_json_1.default,
+            getEntries: (pid) => (0, player_1.getPlayerDailyChallengePointListSync)(pid),
+            updatePoint: (pid, id, pt) => (0, player_1.updatePlayerDailyChallengePointSync)(pid, id, pt),
+        });
         // reward score rewards
         if (questCategory === types_1.QuestCategory.SCORE_ATTACK_EVENT) {
             console.log(`[SCORE_ATTACK] questId=${questId} body={score:${body.score}, elapsed:${body.elapsed_time_ms}, accomplished:${body.is_accomplished}, addMana:${body.add_mana}, continue:${body.continue_count}}`);
-            console.log(`[SCORE_ATTACK] questData={groupId:${questData.scoreRewardGroupId}, groupLen:${(_d = (_c = questData.scoreRewardGroup) === null || _c === void 0 ? void 0 : _c.length) !== null && _d !== void 0 ? _d : 'null'}, bRank:${questData.bRankTime}, aRank:${questData.aRankTime}, sRank:${questData.sRankTime}, sPlus:${questData.sPlusRankTime}, rankPt:${questData.rankPointReward}, charExp:${questData.characterExpReward}, mana:${questData.manaReward}, poolExp:${questData.poolExpReward}, clearReward:${(_f = (_e = questData.clearReward) === null || _e === void 0 ? void 0 : _e.id) !== null && _f !== void 0 ? _f : 'none'}}`);
+            console.log(`[SCORE_ATTACK] questData={groupId:${questData.scoreRewardGroupId}, groupLen:${(_j = (_h = questData.scoreRewardGroup) === null || _h === void 0 ? void 0 : _h.length) !== null && _j !== void 0 ? _j : 'null'}, bRank:${questData.bRankTime}, aRank:${questData.aRankTime}, sRank:${questData.sRankTime}, sPlus:${questData.sPlusRankTime}, rankPt:${questData.rankPointReward}, charExp:${questData.characterExpReward}, mana:${questData.manaReward}, poolExp:${questData.poolExpReward}, clearReward:${(_l = (_k = questData.clearReward) === null || _k === void 0 ? void 0 : _k.id) !== null && _l !== void 0 ? _l : 'none'}}`);
         }
-        console.log(`[BATTLE] scoreReward groupId=${questData.scoreRewardGroupId} groupLen=${(_h = (_g = questData.scoreRewardGroup) === null || _g === void 0 ? void 0 : _g.length) !== null && _h !== void 0 ? _h : 'null'} questId=${questId} category=${questCategory}`);
-        const scoreRewardsResult = (0, quest_1.givePlayerScoreRewardsSync)(playerId, questData.scoreRewardGroupId, questData.scoreRewardGroup, useBoostPoint, questData.element);
+        console.log(`[BATTLE] scoreReward groupId=${questData.scoreRewardGroupId} groupLen=${(_o = (_m = questData.scoreRewardGroup) === null || _m === void 0 ? void 0 : _m.length) !== null && _o !== void 0 ? _o : 'null'} questId=${questId} category=${questCategory}`);
+        const scoreRewardsResult = (0, quest_2.givePlayerScoreRewardsSync)(playerId, questData.scoreRewardGroupId, questData.scoreRewardGroup, useBoostPoint, questData.element);
         let scoreAttackRewardIds = [];
         if (questCategory === types_1.QuestCategory.SCORE_ATTACK_EVENT) {
             // Look up border rewards for score attack events
@@ -225,19 +217,36 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                         console.log(`[SCORE_ATTACK] borderReward matched: score=${body.score} tierScore=${matched.score} coinItem=${matched.coinItemId}x${matched.coinCount}`);
                         // Give coin item only (rewardItemId=16001 does not exist in CDN)
                         if (matched.coinItemId > 0 && matched.coinCount > 0) {
-                            (0, wdfpData_1.givePlayerItemSync)(playerId, matched.coinItemId, matched.coinCount);
-                            scoreRewardsResult.items[String(matched.coinItemId)] = ((_j = scoreRewardsResult.items[String(matched.coinItemId)]) !== null && _j !== void 0 ? _j : 0) + matched.coinCount;
+                            (0, item_1.givePlayerItemSync)(playerId, matched.coinItemId, matched.coinCount);
+                            scoreRewardsResult.items[String(matched.coinItemId)] = ((_p = scoreRewardsResult.items[String(matched.coinItemId)]) !== null && _p !== void 0 ? _p : 0) + matched.coinCount;
                             scoreAttackRewardIds.push(matched.coinItemId);
                         }
                     }
                 }
             }
-            console.log(`[SCORE_ATTACK] afterReward: dropIds=${JSON.stringify(scoreRewardsResult.drop_score_reward_ids)}, drops=${scoreRewardsResult.drop_score_reward_ids.length}, items=${JSON.stringify(scoreRewardsResult.items)}, equipList=${(_l = (_k = scoreRewardsResult.equipment_list) === null || _k === void 0 ? void 0 : _k.length) !== null && _l !== void 0 ? _l : 0}`);
+            console.log(`[SCORE_ATTACK] afterReward: dropIds=${JSON.stringify(scoreRewardsResult.drop_score_reward_ids)}, drops=${scoreRewardsResult.drop_score_reward_ids.length}, items=${JSON.stringify(scoreRewardsResult.items)}, equipList=${(_r = (_q = scoreRewardsResult.equipment_list) === null || _q === void 0 ? void 0 : _q.length) !== null && _r !== void 0 ? _r : 0}`);
             console.log(`[SCORE_ATTACK] response: accomplished=${questAccomplished}, clearRank=${clearRank}, score=${body.score}, elapsed=${body.elapsed_time_ms}, items=${JSON.stringify(scoreRewardsResult.items)}, clientCategory=${questCategory}`);
         }
         // reward character exp
         const bodyPartyStatistics = body.statistics.party;
         const partyCharacterIds = [...bodyPartyStatistics.characters, ...bodyPartyStatistics.unison_characters];
+        // Build finish context for mission trackers
+        const finishCtx = {
+            playerId, questCategory, questId,
+            questAccomplished,
+            clearTime: body.elapsed_time_ms,
+            clearRank,
+            party: body.statistics.party,
+            statistics: body.statistics,
+            player: playerData,
+            questPreviouslyCompleted,
+            questProgress,
+        };
+        // Track mission progress (decoupled from core quest mechanics)
+        (0, character_clear_tracker_1.trackCharacterClears)(finishCtx);
+        (0, leader_powerflip_tracker_1.trackLeaderPowerflip)(finishCtx);
+        (0, party_co_clear_tracker_1.trackPartyCoClears)(finishCtx);
+        (0, powerflip_tracker_1.trackPowerflip)(finishCtx);
         const partyCharacterIdsArray = [];
         for (const value of partyCharacterIds.values()) {
             if (value !== null && value.id !== null)
@@ -249,163 +258,46 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             viewer_id: viewerId
         });
         // handle event quest-specific data & rewards
-        let rushEventData = null;
-        let rushEventRewardsResult = null;
-        if (questCategory === types_1.QuestCategory.RUSH_EVENT) {
-            // rush event
-            const rushEventId = questData.rushEventId;
-            const rushEventFolderId = questData.rushEventFolderId;
-            const rushEventRound = questData.rushEventRound;
-            console.log(`[RUSH] finish: playerId=${playerId} eventId=${rushEventId} folderId=${rushEventFolderId} round=${rushEventRound} clearTime=${clearTime}`);
-            if (rushEventFolderId !== undefined && rushEventRound !== undefined && rushEventId !== undefined) {
-                // update rush event data
-                const rushEventBattleType = rushEventRound === 0 ? types_2.RushEventBattleType.ENDLESS : types_2.RushEventBattleType.FOLDER;
-                // map character ids
-                const characterIds = bodyPartyStatistics.characters.map(val => { var _a; return (_a = val === null || val === void 0 ? void 0 : val.id) !== null && _a !== void 0 ? _a : null; });
-                const unisonCharacterIds = bodyPartyStatistics.unison_characters.map(val => { var _a; return (_a = val === null || val === void 0 ? void 0 : val.id) !== null && _a !== void 0 ? _a : null; });
-                // get evolution image levels
-                const evolutionImgLevels = (0, character_1.getCharactersEvolutionImgLevels)(playerId, characterIds);
-                const unisonEvolutionImgLevels = (0, character_1.getCharactersEvolutionImgLevels)(playerId, unisonCharacterIds);
-                let round = questId;
-                // update endless battle stats
-                let oldEndlessMaxRound = null;
-                let oldBestElapsedTimeMs = null;
-                let newEndlessMaxRound = null;
-                let newEndlessNextRound = null;
-                let newBestElapsedTimeMs = null;
-                if (rushEventBattleType === types_2.RushEventBattleType.ENDLESS) {
-                    // get player rush event data
-                    const playerRushEventData = (0, wdfpData_1.getPlayerRushEventSync)(playerId, rushEventId);
-                    const playerNextRound = (_m = playerRushEventData === null || playerRushEventData === void 0 ? void 0 : playerRushEventData.endlessBattleNextRound) !== null && _m !== void 0 ? _m : 1;
-                    const playerMaxRound = (_o = playerRushEventData === null || playerRushEventData === void 0 ? void 0 : playerRushEventData.endlessBattleMaxRound) !== null && _o !== void 0 ? _o : 1;
-                    const playerBestClearTime = (_p = playerRushEventData === null || playerRushEventData === void 0 ? void 0 : playerRushEventData.endlessBattleMaxRoundTime) !== null && _p !== void 0 ? _p : Number.MAX_SAFE_INTEGER;
-                    round = playerNextRound;
-                    // Capture old values before update
-                    oldEndlessMaxRound = playerMaxRound;
-                    oldBestElapsedTimeMs = playerBestClearTime < Number.MAX_SAFE_INTEGER ? playerBestClearTime : null;
-                    const isNewRecord = (playerNextRound >= playerMaxRound && playerBestClearTime >= clearTime) || (playerNextRound > playerMaxRound);
-                    if (isNewRecord) {
-                        console.log(`[RUSH] finish: ENDLESS NEW RECORD! round=${playerNextRound} time=${clearTime}`);
-                        (0, wdfpData_1.updatePlayerRushEventSync)(playerId, {
-                            eventId: rushEventId,
-                            endlessBattleMaxRound: playerNextRound,
-                            endlessBattleMaxRoundTime: clearTime,
-                            endlessBattleMaxRoundCharacterIds: characterIds,
-                            endlessBattleMaxRoundCharacterEvolutionImgLvls: evolutionImgLevels
-                        });
-                        newEndlessMaxRound = playerNextRound;
-                        newBestElapsedTimeMs = clearTime;
-                    }
-                    else {
-                        newEndlessMaxRound = playerMaxRound;
-                        newBestElapsedTimeMs = playerBestClearTime < Number.MAX_SAFE_INTEGER ? playerBestClearTime : null;
-                    }
-                    newEndlessNextRound = playerNextRound + 1;
-                    // always record played party for endless
-                    (0, wdfpData_1.insertPlayerRushEventPlayedPartySync)(playerId, rushEventId, {
-                        characterIds, unisonCharacterIds,
-                        equipmentIds: bodyPartyStatistics.equipments.map(val => { var _a; return (_a = val === null || val === void 0 ? void 0 : val.id) !== null && _a !== void 0 ? _a : null; }),
-                        abilitySoulIds: bodyPartyStatistics.ability_soul_ids,
-                        evolutionImgLevels, unisonEvolutionImgLevels,
-                        battleType: rushEventBattleType, round
-                    });
-                }
-                else if (rushEventBattleType === types_2.RushEventBattleType.FOLDER) {
-                    const isFolderFinal = rushEventRound >= ((_q = rushEvent_1.rushEventFolderMaxRounds[rushEventFolderId]) !== null && _q !== void 0 ? _q : 0);
-                    if (isFolderFinal) {
-                        // mark folder as complete
-                        (0, wdfpData_1.insertPlayerRushEventClearedFolderSync)(playerId, rushEventId, rushEventFolderId);
-                        (0, wdfpData_1.updatePlayerRushEventSync)(playerId, { eventId: rushEventId, activeRushBattleFolderId: null });
-                        (0, wdfpData_1.deletePlayerRushEventPlayedPartyListSync)(playerId, rushEventId, rushEventBattleType);
-                    }
-                    else {
-                        // record played party for non-final rounds
-                        (0, wdfpData_1.insertPlayerRushEventPlayedPartySync)(playerId, rushEventId, {
-                            characterIds, unisonCharacterIds,
-                            equipmentIds: bodyPartyStatistics.equipments.map(val => { var _a; return (_a = val === null || val === void 0 ? void 0 : val.id) !== null && _a !== void 0 ? _a : null; }),
-                            abilitySoulIds: bodyPartyStatistics.ability_soul_ids,
-                            evolutionImgLevels, unisonEvolutionImgLevels,
-                            battleType: rushEventBattleType, round
-                        });
-                    }
-                }
-                // get serialized parties
-                const serializedPlayedParties = (0, rush_1.getSerializedPlayerRushEventPlayedPartiesSync)(playerId, rushEventId);
-                // set rush event data
-                const isEndless = rushEventBattleType === types_2.RushEventBattleType.ENDLESS;
-                rushEventData = {
-                    "rush_battle_reward_list": [],
-                    "rush_battle_played_party_list": serializedPlayedParties.folderParties,
-                    "endless_battle_played_party_list": serializedPlayedParties.endlessParties,
-                    "is_out_of_period": false,
-                    "endless_battle_next_round": isEndless ? newEndlessNextRound : null,
-                    "endless_battle_max_round": isEndless ? newEndlessMaxRound : null,
-                    "high_score": isEndless ? clearTime : null,
-                    "best_elapsed_time_ms": isEndless ? newBestElapsedTimeMs : null,
-                    "old_endless_battle_max_round": isEndless ? oldEndlessMaxRound : null,
-                    "old_best_elapsed_time_ms": isEndless ? oldBestElapsedTimeMs : null
-                };
-                // give rewards if allowed (FOLDER only, not ENDLESS)
-                if (rushEventBattleType === types_2.RushEventBattleType.FOLDER && rushEventRound >= ((_r = rushEvent_1.rushEventFolderMaxRounds[rushEventFolderId]) !== null && _r !== void 0 ? _r : 0)) {
-                    const rewards = (_s = (0, assets_1.getRushEventFolderClearRewards)(rushEventId, rushEventFolderId)) !== null && _s !== void 0 ? _s : [];
-                    console.log(`[RUSH] finish: folder clear! rewards=${rewards.length} items`);
-                    rushEventRewardsResult = (0, quest_1.givePlayerRewardsSync)(playerId, rewards);
-                    rushEventData.rush_battle_reward_list = rewards.map(reward => {
-                        const itemReward = reward;
-                        return {
-                            "kind": 1,
-                            "kind_id": itemReward.id,
-                            "number": itemReward.count
-                        };
-                    });
-                }
-            }
-        }
+        const { rushEventData, rushEventRewardsResult } = (0, rush_handler_1.handleRushEventFinish)({
+            questCategory,
+            questData,
+            clearTime,
+            party: bodyPartyStatistics,
+            playerId,
+            questId,
+            getEvoLevels: (pid, chars) => (0, character_1.getCharactersEvolutionImgLevels)(pid, chars),
+            folderMaxRounds: rushEvent_2.rushEventFolderMaxRounds,
+            getRushEvent: (pid, eid) => (0, rushEvent_1.getPlayerRushEventSync)(pid, eid),
+            updateRushEvent: (pid, data) => (0, rushEvent_1.updatePlayerRushEventSync)(pid, data),
+            insertParty: (pid, eid, p) => (0, rushEvent_1.insertPlayerRushEventPlayedPartySync)(pid, eid, p),
+            insertClearedFolder: (pid, eid, fid) => (0, rushEvent_1.insertPlayerRushEventClearedFolderSync)(pid, eid, fid),
+            deletePartyList: (pid, eid, bt) => (0, rushEvent_1.deletePlayerRushEventPlayedPartyListSync)(pid, eid, bt),
+            getSerializedParties: (pid, eid) => (0, rush_1.getSerializedPlayerRushEventPlayedPartiesSync)(pid, eid),
+            getFolderRewards: (eid, fid) => (0, assets_1.getRushEventFolderClearRewards)(eid, fid),
+            giveRewards: (pid, r) => (0, quest_2.givePlayerRewardsSync)(pid, r),
+        });
         // Record played party for RAID_EVENT
-        if (questCategory === types_1.QuestCategory.RAID_EVENT && activeQuestData.eventId) {
-            const eventId = activeQuestData.eventId;
-            const characterIds = bodyPartyStatistics.characters.map(val => { var _a; return (_a = val === null || val === void 0 ? void 0 : val.id) !== null && _a !== void 0 ? _a : null; });
-            const unisonCharacterIds = bodyPartyStatistics.unison_characters.map(val => { var _a; return (_a = val === null || val === void 0 ? void 0 : val.id) !== null && _a !== void 0 ? _a : null; });
-            const evolutionImgLevels = (0, character_1.getCharactersEvolutionImgLevels)(playerId, characterIds);
-            const unisonEvolutionImgLevels = (0, character_1.getCharactersEvolutionImgLevels)(playerId, unisonCharacterIds);
-            (0, wdfpData_1.insertPlayerRushEventPlayedPartySync)(playerId, eventId, {
-                characterIds, unisonCharacterIds,
-                equipmentIds: bodyPartyStatistics.equipments.map(val => { var _a; return (_a = val === null || val === void 0 ? void 0 : val.id) !== null && _a !== void 0 ? _a : null; }),
-                abilitySoulIds: bodyPartyStatistics.ability_soul_ids,
-                evolutionImgLevels,
-                unisonEvolutionImgLevels,
-                battleType: types_2.RushEventBattleType.FOLDER,
-                round: questId
-            });
-            console.log(`[RAID] recorded played party: eventId=${eventId} questId=${questId}`);
-        }
+        (0, raid_handler_1.handleRaidEventFinish)({
+            questCategory,
+            activeEventId: activeQuestData.eventId,
+            party: bodyPartyStatistics,
+            playerId,
+            questId,
+            getEvoLevelsFn: (pid, chars) => (0, character_1.getCharactersEvolutionImgLevels)(pid, chars),
+            insertPartyFn: (pid, eid, p) => (0, rushEvent_1.insertPlayerRushEventPlayedPartySync)(pid, eid, p),
+        });
         // handle carnival event score & records
-        let carnivalEventData = null;
-        if (questCategory === types_1.QuestCategory.CARNIVAL_EVENT && questAccomplished) {
-            const carnivalInfo = carnivalScoreLookup[String(questId)];
-            if (carnivalInfo) {
-                const characterIds = bodyPartyStatistics.characters.map((v) => { var _a; return (_a = v === null || v === void 0 ? void 0 : v.id) !== null && _a !== void 0 ? _a : null; });
-                const unisonCharacterIds = bodyPartyStatistics.unison_characters.map((v) => { var _a; return (_a = v === null || v === void 0 ? void 0 : v.id) !== null && _a !== void 0 ? _a : null; });
-                const leaderCharId = (_u = (_t = bodyPartyStatistics.leader) === null || _t === void 0 ? void 0 : _t.id) !== null && _u !== void 0 ? _u : 0;
-                const difficultyBonus = carnivalInfo.difficulty_score * 100;
-                const timeBonus = Math.max(0, carnivalInfo.time_limit_ms - clearTime);
-                const totalScore = difficultyBonus + timeBonus;
-                (0, wdfpData_1.upsertPlayerCarnivalEventRecordSync)(playerId, carnivalInfo.event_id, carnivalInfo.folder_id, totalScore, characterIds, unisonCharacterIds);
-                // Build carnival_event response for client
-                const previousTotalBest = carnivalEventData === null ? 0 : 0; // simplified: no previous total
-                carnivalEventData = {
-                    is_record_valid: true,
-                    leader_character_id: leaderCharId,
-                    new_degree_ids: [],
-                    previous_total_best_score: previousTotalBest,
-                    reward_ids: [],
-                    score: {
-                        difficulty_bonus: difficultyBonus,
-                        time_bonus: timeBonus
-                    }
-                };
-            }
-        }
+        const carnivalEventData = (0, carnival_handler_1.handleCarnivalEventFinish)({
+            questCategory,
+            questAccomplished,
+            questId,
+            clearTime,
+            party: bodyPartyStatistics,
+            playerId,
+            carnivalLookup: carnivalScoreLookup,
+            upsertFn: (pid, eid, fid, score, chars, unisons) => (0, carnivalEvent_1.upsertPlayerCarnivalEventRecordSync)(pid, eid, fid, score, chars, unisons),
+        });
+        const itemList = Object.assign(Object.assign(Object.assign({}, (activeQuestData.entryItemId ? { [activeQuestData.entryItemId]: (_s = (0, item_1.getPlayerItemSync)(playerId, activeQuestData.entryItemId)) !== null && _s !== void 0 ? _s : 0 } : {})), scoreRewardsResult.items), ((_t = rushEventRewardsResult === null || rushEventRewardsResult === void 0 ? void 0 : rushEventRewardsResult.items) !== null && _t !== void 0 ? _t : {}));
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({
             "data_headers": dataHeaders,
@@ -416,8 +308,9 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                     "exp_pooled_time": (0, utils_1.getServerTime)(playerData.expPooledTime),
                     "free_vmoney": playerData.freeVmoney + ((clearReward === null || clearReward === void 0 ? void 0 : clearReward.user_info.free_vmoney) || 0) + ((sPlusClearReward === null || sPlusClearReward === void 0 ? void 0 : sPlusClearReward.user_info.free_vmoney) || 0) + scoreRewardsResult.user_info.free_vmoney,
                     "rank_point": newRankPoint,
+                    "degree_id": 1,
                     "stamina": playerData.stamina,
-                    "stamina_heal_time": (0, utils_1.getServerTime)(),
+                    "stamina_heal_time": (0, utils_1.realToVirtual)(playerData.staminaHealTime),
                     "boost_point": newBoostPoint,
                     "boss_boost_point": newBossBoostPoint
                 },
@@ -458,7 +351,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "start_time": dataHeaders['servertime'],
                 "is_multi": "single",
                 "quest_name": "",
-                "item_list": Object.assign(Object.assign(Object.assign({}, (activeQuestData.entryItemId ? { [activeQuestData.entryItemId]: (_v = (0, wdfpData_1.getPlayerItemSync)(playerId, activeQuestData.entryItemId)) !== null && _v !== void 0 ? _v : 0 } : {})), scoreRewardsResult.items), ((_w = rushEventRewardsResult === null || rushEventRewardsResult === void 0 ? void 0 : rushEventRewardsResult.items) !== null && _w !== void 0 ? _w : {})),
+                "item_list": itemList,
                 "rush_event": rushEventData,
                 "carnival_event": carnivalEventData,
                 "user_daily_challenge_point_list": dailyChallengePointList !== null && dailyChallengePointList !== void 0 ? dailyChallengePointList : [],
@@ -471,26 +364,18 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         const viewerId = body.viewer_id;
         if (isNaN(viewerId))
             return reply.status(400).send({
-                "error": "Bad Request",
-                "message": "Invalid request body."
+                "error": "Bad Request", "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
-        if (!viewerIdSession)
+        const sessionResult = yield (0, session_validator_1.validateSessionAndPlayer)(viewerId);
+        if (!sessionResult)
             return reply.status(400).send({
-                "error": "Bad Request",
-                "message": "Invalid viewer id."
+                "error": "Bad Request", "message": "Invalid viewer id."
             });
-        // get player
-        const playerId = (0, activeAccount_1.resolvePlayerIdSync)(viewerIdSession.accountId);
-        if (playerId === null)
-            return reply.status(500).send({
-                "error": "Internal Server Error",
-                "message": "No player bound to account."
-            });
+        const { playerId } = sessionResult;
         const headers = (0, utils_1.generateDataHeaders)({ viewer_id: body.viewer_id });
         // delete existing active quest
         delete exports.activeQuests[playerId];
-        (0, wdfpData_1.deletePlayerActiveQuestSync)(playerId);
+        (0, quest_active_1.deletePlayerActiveQuestSync)(playerId);
         return reply.status(200).send({
             "data_headers": headers,
             "data": {
@@ -503,7 +388,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         });
     }));
     fastify.post("/start", (request, reply) => __awaiter(void 0, void 0, void 0, function* () {
-        var _x, _y, _z;
+        var _u, _v, _w;
         const body = request.body;
         const viewerId = body.viewer_id;
         const partyId = body.party_id;
@@ -514,22 +399,14 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         const isAutoStartMode = body.is_auto_start_mode;
         if (isNaN(viewerId) || isNaN(partyId) || isNaN(questId) || isNaN(category) || useBoostPoint === undefined || useBossBoostPoint === undefined || isAutoStartMode === undefined)
             return reply.status(400).send({
-                "error": "Bad Request",
-                "message": "Invalid request body."
+                "error": "Bad Request", "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
-        if (!viewerIdSession)
+        const sessionResult = yield (0, session_validator_1.validateSessionAndPlayer)(viewerId);
+        if (!sessionResult)
             return reply.status(400).send({
-                "error": "Bad Request",
-                "message": "Invalid viewer id."
+                "error": "Bad Request", "message": "Invalid viewer id."
             });
-        // get player
-        const playerId = (0, activeAccount_1.resolvePlayerIdSync)(viewerIdSession.accountId);
-        if (playerId === null)
-            return reply.status(500).send({
-                "error": "Internal Server Error",
-                "message": "No player bound to account."
-            });
+        const { playerId, playerData: player } = sessionResult;
         // get quest data
         const questData = (0, assets_1.getQuestFromCategorySync)(category, questId);
         if (questData === null || !('rankPointReward' in questData)) {
@@ -542,9 +419,10 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         // Deduct entry cost (ticket/item)
         const questKey = `${category}_${questId}`;
         const entryCost = quest_entry_costs_json_1.default[questKey];
-        console.log(`[BATTLE] start entry: questId=${questId} questKey=${questKey} entryCost=${JSON.stringify(entryCost)}`);
+        const staminaInfo = (0, stamina_cost_1.getStaminaCost)(questKey);
+        console.log(`[BATTLE] start entry: questId=${questId} questKey=${questKey} entryCost=${JSON.stringify(entryCost)} discountRate=${staminaInfo.rate} baseStamina=${staminaInfo.baseCost}→${staminaInfo.cost}`);
         if (entryCost && entryCost.itemId > 0) {
-            const playerItemCount = (_x = (0, wdfpData_1.getPlayerItemSync)(playerId, entryCost.itemId)) !== null && _x !== void 0 ? _x : 0;
+            const playerItemCount = (_u = (0, item_1.getPlayerItemSync)(playerId, entryCost.itemId)) !== null && _u !== void 0 ? _u : 0;
             console.log(`[BATTLE] start deduct: itemId=${entryCost.itemId} playerHas=${playerItemCount} need=${entryCost.itemCount}`);
             if (playerItemCount < entryCost.itemCount) {
                 return reply.status(400).send({
@@ -552,21 +430,13 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                     "message": `Not enough entry items (need ${entryCost.itemCount} of ${entryCost.itemId}, have ${playerItemCount}).`
                 });
             }
-            (0, wdfpData_1.updatePlayerItemSync)(playerId, entryCost.itemId, playerItemCount - entryCost.itemCount);
+            (0, item_1.updatePlayerItemSync)(playerId, entryCost.itemId, playerItemCount - entryCost.itemCount);
         }
         // Deduct stamina cost
-        const staminaCost = (_y = entryCost === null || entryCost === void 0 ? void 0 : entryCost.stamina) !== null && _y !== void 0 ? _y : 0;
+        const staminaCost = staminaInfo.cost;
         let afterStamina = 0;
         if (staminaCost > 0) {
-            const player = (0, wdfpData_1.getPlayerSync)(playerId);
-            if (!player) {
-                console.error(`[BATTLE-START] player not found: ${playerId}`);
-                return reply.status(500).send({
-                    "error": "Internal Server Error",
-                    "message": "Player not found."
-                });
-            }
-            const currentStamina = player.stamina;
+            const currentStamina = (0, stamina_1.computeRealTimeStamina)(player);
             if (currentStamina < staminaCost) {
                 console.warn(`[BATTLE-START] player ${playerId} stamina insufficient: ${currentStamina} < ${staminaCost}`);
                 return reply.status(400).send({
@@ -575,18 +445,19 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 });
             }
             const newStamina = Math.max(0, currentStamina - staminaCost);
-            (0, wdfpData_1.updatePlayerSync)({
+            (0, player_1.updatePlayerSync)({
                 id: playerId,
                 stamina: newStamina,
-                staminaHealTime: new Date()
+                staminaHealTime: new Date(),
+                totalStaminaUsed: ((_v = player.totalStaminaUsed) !== null && _v !== void 0 ? _v : 0) + staminaCost
             });
             afterStamina = newStamina;
-            console.log(`[BATTLE-START] stamina: ${currentStamina} -> ${newStamina} (cost: ${staminaCost})`);
+            console.log(`[BATTLE-START] stamina: ${currentStamina} -> ${newStamina} (cost: ${staminaCost}, rate: ${staminaInfo.rate})`);
         }
         else {
             // No stamina deduction, read current stamina for response
-            const player = (0, wdfpData_1.getPlayerSync)(playerId);
-            afterStamina = (_z = player === null || player === void 0 ? void 0 : player.stamina) !== null && _z !== void 0 ? _z : 0;
+            const player = (0, player_1.getPlayerSync)(playerId);
+            afterStamina = (_w = player === null || player === void 0 ? void 0 : player.stamina) !== null && _w !== void 0 ? _w : 0;
         }
         // add to active quests table
         delete exports.activeQuests[playerId];
@@ -603,7 +474,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         };
         // update player last party slot
         if (questData.fixedParty === undefined) {
-            (0, wdfpData_1.updatePlayerSync)({
+            (0, player_1.updatePlayerSync)({
                 id: playerId,
                 partySlot: partyId
             });
@@ -618,7 +489,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "user_info": {
                     "last_main_quest_id": body.quest_id,
                     "stamina": afterStamina,
-                    "stamina_heal_time": (0, utils_1.getServerTime)()
+                    "stamina_heal_time": (0, utils_1.realToVirtual)(new Date())
                 },
                 "category_id": body.category,
                 "is_multi": "single",
@@ -632,23 +503,14 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         const viewerId = body.viewer_id;
         if (isNaN(viewerId))
             return reply.status(400).send({
-                "error": "Bad Request",
-                "message": "Invalid request body."
+                "error": "Bad Request", "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
-        if (!viewerIdSession)
+        const sessionResult = yield (0, session_validator_1.validateSessionAndPlayer)(viewerId);
+        if (!sessionResult)
             return reply.status(400).send({
-                "error": "Bad Request",
-                "message": "Invalid viewer id."
+                "error": "Bad Request", "message": "Invalid viewer id."
             });
-        // get player
-        const playerId = (0, activeAccount_1.resolvePlayerIdSync)(viewerIdSession.accountId);
-        const player = playerId !== null ? (0, wdfpData_1.getPlayerSync)(playerId) : null;
-        if (player === null)
-            return reply.status(500).send({
-                "error": "Internal Server Error",
-                "message": "No player bound to account."
-            });
+        const { playerId, playerData: player } = sessionResult;
         // get active quest data
         const activeQuestData = exports.activeQuests[playerId];
         if (activeQuestData === undefined)
@@ -667,14 +529,14 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             });
         // update the player's vmoney balances
         const setNewFreeVmoney = 0 > newFreeVmoney ? freeVmoney : newFreeVmoney;
-        (0, wdfpData_1.updatePlayerSync)({
+        (0, player_1.updatePlayerSync)({
             id: playerId,
             freeVmoney: setNewFreeVmoney,
             vmoney: newVmoney
         });
         // increment continue count for battle recovery
         activeQuestData.continueCount++;
-        (0, wdfpData_1.updatePlayerActiveQuestContinueCountSync)(playerId, activeQuestData.continueCount);
+        (0, quest_active_1.updatePlayerActiveQuestContinueCountSync)(playerId, activeQuestData.continueCount);
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({
             "data_headers": (0, utils_1.generateDataHeaders)({

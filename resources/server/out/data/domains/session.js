@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateViewerIdSession = exports.deleteAccountSessionsOfType = exports.deleteAccountSessions = exports.deleteSession = exports.insertSession = exports.insertSessionWithToken = exports.getAccountSessionsOfType = exports.deleteDeviceBindingSync = exports.insertDeviceBindingSync = exports.getDeviceBindingSync = exports.getViewerIdSync = exports.getSession = void 0;
+exports.generateViewerIdSession = exports.deleteAccountSessionsOfType = exports.deleteAccountSessionsOfTypeSync = exports.deleteAccountSessions = exports.deleteSession = exports.deleteSessionSync = exports.insertSession = exports.insertSessionWithToken = exports.getAccountSessionsOfType = exports.getAccountSessionsOfTypeSync = exports.getSessionByAccountIdSync = exports.updateDeviceBindingNameSync = exports.getAllDeviceBindingsSync = exports.deleteDeviceBindingSync = exports.insertDeviceBindingSync = exports.getDeviceBindingSync = exports.getViewerIdSync = exports.getSession = void 0;
 const db_1 = require("../db");
 const crypto_1 = require("crypto");
 const types_1 = require("../types");
@@ -75,19 +75,38 @@ exports.getViewerIdSync = getViewerIdSync;
  * Device binding: maps device_id → account_id
  */
 function getDeviceBindingSync(deviceId) {
-    const row = (0, db_1.getDb)().prepare(`SELECT device_id, account_id FROM device_bindings WHERE device_id = ?`).get(deviceId);
+    const row = (0, db_1.getDb)().prepare(`SELECT device_id, account_id, name FROM device_bindings WHERE device_id = ?`).get(deviceId);
     return row !== null && row !== void 0 ? row : null;
 }
 exports.getDeviceBindingSync = getDeviceBindingSync;
-function insertDeviceBindingSync(deviceId, accountId) {
-    (0, db_1.getDb)().prepare(`INSERT OR REPLACE INTO device_bindings (device_id, account_id, last_seen) VALUES (?, ?, ?)`)
-        .run(deviceId, accountId, new Date().toISOString());
+function insertDeviceBindingSync(deviceId, accountId, name) {
+    (0, db_1.getDb)().prepare(`INSERT OR REPLACE INTO device_bindings (device_id, account_id, last_seen, name) VALUES (?, ?, ?, ?)`)
+        .run(deviceId, accountId, new Date().toISOString(), name !== null && name !== void 0 ? name : null);
 }
 exports.insertDeviceBindingSync = insertDeviceBindingSync;
 function deleteDeviceBindingSync(deviceId) {
     (0, db_1.getDb)().prepare(`DELETE FROM device_bindings WHERE device_id = ?`).run(deviceId);
 }
 exports.deleteDeviceBindingSync = deleteDeviceBindingSync;
+/** Get all device bindings for admin panel */
+function getAllDeviceBindingsSync() {
+    return (0, db_1.getDb)().prepare(`SELECT device_id, account_id, name FROM device_bindings`).all();
+}
+exports.getAllDeviceBindingsSync = getAllDeviceBindingsSync;
+function updateDeviceBindingNameSync(deviceId, name) {
+    (0, db_1.getDb)().prepare(`UPDATE device_bindings SET name = ? WHERE device_id = ?`).run(name, deviceId);
+}
+exports.updateDeviceBindingNameSync = updateDeviceBindingNameSync;
+/**
+ * Synchronously gets a session by account_id and type (for viewer_id reuse).
+ */
+function getSessionByAccountIdSync(accountId, type) {
+    const raw = (0, db_1.getDb)().prepare(`
+    SELECT token, account_id, expires, type FROM sessions WHERE account_id = ? AND type = ?
+    `).get(accountId, type);
+    return raw ? buildSession(raw) : null;
+}
+exports.getSessionByAccountIdSync = getSessionByAccountIdSync;
 /**
  * Synchronously returns all of the sessions of a particular type belonging to an account.
  *
@@ -103,6 +122,7 @@ function getAccountSessionsOfTypeSync(accountId, type) {
     `).all(accountId, type);
     return rawResult.map(raw => buildSession(raw));
 }
+exports.getAccountSessionsOfTypeSync = getAccountSessionsOfTypeSync;
 /**
  * Returns all of the sessions of a particular type belonging to an account.
  *
@@ -187,6 +207,7 @@ exports.insertSession = insertSession;
 function deleteSessionSync(token) {
     (0, db_1.getDb)().prepare(`DELETE FROM sessions WHERE token = ?`).run(token);
 }
+exports.deleteSessionSync = deleteSessionSync;
 /**
  * Deletes a session from the database based on its token.
  *
@@ -241,6 +262,7 @@ function deleteAccountSessionsOfTypeSync(accountId, type) {
     WHERE account_id = ? AND type = ?
     `).run(accountId, type);
 }
+exports.deleteAccountSessionsOfTypeSync = deleteAccountSessionsOfTypeSync;
 /**
  * Deletes all of an account's sessions of a particular type.
  *

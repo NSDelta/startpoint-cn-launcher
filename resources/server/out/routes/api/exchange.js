@@ -12,12 +12,15 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const wdfpData_1 = require("../../data/wdfpData");
+const character_1 = require("../../data/domains/character");
+const equipment_1 = require("../../data/domains/equipment");
+const player_1 = require("../../data/domains/player");
+const session_1 = require("../../data/domains/session");
 const item_1 = require("../../data/domains/item");
 const activeAccount_1 = require("../../data/activeAccount");
 const utils_1 = require("../../utils");
-const character_1 = require("../../lib/character");
-const equipment_1 = require("../../lib/equipment");
+const character_2 = require("../../lib/character");
+const equipment_2 = require("../../lib/equipment");
 const star_crumb_exchange_json_1 = __importDefault(require("../../../assets/star_crumb_exchange.json"));
 const star_crumb_exchange_cost_json_1 = __importDefault(require("../../../assets/star_crumb_exchange_cost.json"));
 const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
@@ -30,14 +33,14 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 error: "Bad Request",
                 message: "Invalid request body.",
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 error: "Bad Request",
                 message: "Invalid viewer id.",
             });
         const playerId = (0, activeAccount_1.resolvePlayerIdSync)(viewerIdSession.accountId);
-        const player = playerId !== null ? (0, wdfpData_1.getPlayerSync)(playerId) : null;
+        const player = playerId !== null ? (0, player_1.getPlayerSync)(playerId) : null;
         if (player === null)
             return reply.status(500).send({
                 error: "Internal Server Error",
@@ -77,24 +80,24 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 message: "Not enough star_crumb.",
             });
         // Validate ownership
-        if (kind === 0 && (0, wdfpData_1.playerOwnsCharacterSync)(playerId, targetId)) {
+        if (kind === 0 && (0, character_1.playerOwnsCharacterSync)(playerId, targetId)) {
             return reply.status(400).send({ error: "Bad Request", message: "Character already owned." });
         }
-        if (kind === 2 && (0, wdfpData_1.playerOwnsEquipmentSync)(playerId, targetId)) {
+        if (kind === 2 && (0, equipment_1.playerOwnsEquipmentSync)(playerId, targetId)) {
             return reply.status(400).send({ error: "Bad Request", message: "Equipment already owned." });
         }
         // Deduct
         const newStarCrumb = player.starCrumb - cost;
-        (0, wdfpData_1.updatePlayerSync)({ id: playerId, starCrumb: newStarCrumb });
+        (0, player_1.updatePlayerSync)({ id: playerId, starCrumb: newStarCrumb });
         // Give reward
         const characterList = [];
         const itemList = {};
         const equipmentList = [];
         switch (kind) {
             case 0: { // Character
-                const result = (0, character_1.givePlayerCharacterSync)(playerId, targetId);
+                const result = (0, character_2.givePlayerCharacterSync)(playerId, targetId);
                 if (!result) {
-                    (0, wdfpData_1.updatePlayerSync)({ id: playerId, starCrumb: player.starCrumb });
+                    (0, player_1.updatePlayerSync)({ id: playerId, starCrumb: player.starCrumb });
                     return reply.status(500).send({ error: "Internal Server Error", message: "Failed to give character." });
                 }
                 characterList.push(result.character);
@@ -106,9 +109,9 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 break;
             }
             case 2: { // Equipment
-                const result = (0, equipment_1.givePlayerEquipmentSync)(playerId, targetId, 1);
+                const result = (0, equipment_2.givePlayerEquipmentSync)(playerId, targetId, 1);
                 if (!result) {
-                    (0, wdfpData_1.updatePlayerSync)({ id: playerId, starCrumb: player.starCrumb });
+                    (0, player_1.updatePlayerSync)({ id: playerId, starCrumb: player.starCrumb });
                     return reply.status(500).send({ error: "Internal Server Error", message: "Failed to give equipment." });
                 }
                 equipmentList.push(result);

@@ -106,6 +106,42 @@ body.firstrun-active .tabs { pointer-events: none; opacity: .4; }
 #logs.panel { padding: 0; }
 #logs.panel.active { display: flex; flex-direction: column; }
 .logbar { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+.logbar-actions { display: inline-flex; align-items: center; gap: 8px; }
+.logtoggle { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; user-select: none; }
+.logtoggle input { margin: 0; }
+.portrow { position: relative; display: inline-flex; align-items: center; gap: 10px; }
+.portrow input { display: inline-block; width: 120px; margin-top: 0; }
+.port-dd { position: absolute; top: 100%; left: 0; margin-top: 3px; width: 130px; max-height: 240px; overflow-y: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; z-index: 50; box-shadow: 0 8px 22px rgba(0,0,0,.45); }
+.port-opt { padding: 7px 12px; cursor: pointer; font-size: 14px; font-variant-numeric: tabular-nums; }
+.port-opt:hover { background: var(--primary-dim); }
+.portwarn { color: var(--danger); font-size: 12px; white-space: nowrap; }
+input[type="datetime-local"] { padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; color: var(--text); font-size: 14px; color-scheme: dark; }
+details.advanced { margin-top: 18px; margin-bottom: 18px; border-top: 1px solid var(--line); padding-top: 8px; }
+details.advanced > summary { cursor: pointer; color: var(--muted); font-size: 13px; user-select: none; padding: 4px 0; }
+details.advanced > summary:hover { color: var(--text); }
+details.advanced .switchrow { display: flex; align-items: center; gap: 8px; margin: 12px 0 0; }
+details.advanced .switchrow input { margin: 0; }
+.beta { font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--primary-dim); color: var(--primary); border: 1px solid var(--primary); white-space: nowrap; }
+.picker-box { width: 520px; max-width: 92vw; }
+.picker-head { display: flex; align-items: stretch; gap: 10px; margin-bottom: 10px; }
+.picker-head h3 { margin: 0; font-size: 15px; white-space: nowrap; display: flex; align-items: center; }
+.picker-head #pickerSearch { flex: 1; margin-top: 0; }
+.picker-head #pickerClose { padding: 0 16px; }
+.picker-list { max-height: 52vh; overflow-y: auto; border: 1px solid var(--line); border-radius: 8px; }
+.picker-row { display: flex; align-items: center; gap: 10px; padding: 7px 10px; cursor: pointer; border-bottom: 1px solid var(--line); }
+.picker-row:last-child { border-bottom: none; }
+.picker-row:hover { background: var(--primary-dim); }
+.pk-id { min-width: 74px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.pk-name { flex: 1; }
+.pk-sub { color: var(--muted); font-size: 12px; text-align: right; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.picker-more { padding: 8px 10px; color: var(--muted); font-size: 12px; text-align: center; }
+.tbl td.nm { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 群發郵件:附件 ID(輸入+查表鈕)與數量三者等高、對齊 */
+.grid2 label > .row { margin-top: 6px; }
+.grid2 .row input { margin-top: 0; }
+/* 玩家詳情各類別分頁鈕 */
+.pager { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; vertical-align: middle; }
+.pager .page { font-size: 12px; color: var(--muted); min-width: 34px; text-align: center; }
 #allLogOut { flex: 1; margin: 0; background: #0a0c10; padding: 12px 14px; overflow: auto; font-family: monospace; font-size: 12px; color: #cfd6e2; white-space: pre-wrap; }
 
 /* ===== admin ===== */
@@ -163,6 +199,7 @@ button.x { background: transparent; color: var(--danger); border: 1px solid var(
 .acct-actions .cell { width: 100px; }
 .card { max-width: 560px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; }
 .card h3 { margin: 0 0 12px; font-size: 16px; }
+.card label > .row { margin-top: 8px; }
 .card .kv { color: var(--text); font-size: 14px; }
 .card select { display: block; width: 100%; margin-top: 6px; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }

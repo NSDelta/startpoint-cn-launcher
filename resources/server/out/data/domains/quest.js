@@ -16,7 +16,9 @@ function buildPlayerQuestProgress(raw) {
         unlocked: (0, utils_1.deserializeBoolean)(raw.unlocked),
         highScore: raw.high_score,
         clearRank: raw.clear_rank,
-        bestElapsedTimeMs: raw.best_elapsed_time_ms
+        bestElapsedTimeMs: raw.best_elapsed_time_ms,
+        leaderCharacterId: raw.leader_character_id,
+        multiClearCount: raw.multi_clear_count
     };
 }
 /**
@@ -27,7 +29,7 @@ function buildPlayerQuestProgress(raw) {
  */
 function getPlayerQuestProgressSync(playerId) {
     const rawProgress = (0, db_1.getDb)().prepare(`
-    SELECT section, quest_id, finished, unlocked, high_score, clear_rank, best_elapsed_time_ms
+    SELECT section, quest_id, finished, unlocked, high_score, clear_rank, best_elapsed_time_ms, leader_character_id, multi_clear_count
     FROM players_quest_progress
     WHERE player_id = ?
     `).all(playerId);
@@ -54,7 +56,7 @@ exports.getPlayerQuestProgressSync = getPlayerQuestProgressSync;
  */
 function getPlayerSingleQuestProgressSync(playerId, section, questId) {
     const rawProgress = (0, db_1.getDb)().prepare(`
-    SELECT section, quest_id, finished, unlocked, high_score, clear_rank, best_elapsed_time_ms
+    SELECT section, quest_id, finished, unlocked, high_score, clear_rank, best_elapsed_time_ms, leader_character_id, multi_clear_count
     FROM players_quest_progress
     WHERE player_id = ? AND section = ? AND quest_id = ?
     `).get(playerId, Number(section), Number(questId));
@@ -71,11 +73,11 @@ exports.getPlayerSingleQuestProgressSync = getPlayerSingleQuestProgressSync;
  * @param data The data of this quest progress.
  */
 function insertPlayerQuestProgressSync(playerId, section, data) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e;
     (0, db_1.getDb)().prepare(`
-    INSERT INTO players_quest_progress (section, quest_id, finished, unlocked, high_score, clear_rank, best_elapsed_time_ms, player_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(Number(section), data.questId, (0, utils_1.serializeBoolean)(data.finished), (0, utils_1.serializeBoolean)((_a = data.unlocked) !== null && _a !== void 0 ? _a : false), (_b = data.highScore) !== null && _b !== void 0 ? _b : null, (_c = data.clearRank) !== null && _c !== void 0 ? _c : null, (_d = data.bestElapsedTimeMs) !== null && _d !== void 0 ? _d : null, playerId);
+    INSERT INTO players_quest_progress (section, quest_id, finished, unlocked, high_score, clear_rank, best_elapsed_time_ms, leader_character_id, player_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(Number(section), data.questId, (0, utils_1.serializeBoolean)(data.finished), (0, utils_1.serializeBoolean)((_a = data.unlocked) !== null && _a !== void 0 ? _a : false), (_b = data.highScore) !== null && _b !== void 0 ? _b : null, (_c = data.clearRank) !== null && _c !== void 0 ? _c : null, (_d = data.bestElapsedTimeMs) !== null && _d !== void 0 ? _d : null, (_e = data.leaderCharacterId) !== null && _e !== void 0 ? _e : null, playerId);
 }
 exports.insertPlayerQuestProgressSync = insertPlayerQuestProgressSync;
 /**
@@ -107,7 +109,8 @@ function updatePlayerQuestProgressSync(playerId, section, data) {
         'unlocked': 'unlocked',
         'highScore': 'high_score',
         'clearRank': 'clear_rank',
-        'bestElapsedTimeMs': 'best_elapsed_time_ms'
+        'bestElapsedTimeMs': 'best_elapsed_time_ms',
+        'leaderCharacterId': 'leader_character_id'
     };
     const sets = [];
     const values = [];

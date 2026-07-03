@@ -10,10 +10,11 @@
     <button class="tab active" data-tab="control">控制</button>
     <button class="tab" data-tab="settings">設定</button>
     <button class="tab" data-tab="apk">打包 APK</button>
+    <button class="tab" data-tab="ios">打包 IPA</button>
     <button class="tab" data-tab="admin">管理面板</button>
     <button class="tab" data-tab="logs">日誌</button>
     <span class="brand">StartPoint <b>CN</b></span>
-    <button id="langToggle" class="lang" title="简体 / 繁體">简</button>
+    <button id="langToggle" class="lang" title="语言 / Language:繁 → 简 → EN">繁</button>
   </nav>
 
   <main>
@@ -86,8 +87,20 @@
           <button id="detectIp" class="mini">偵測本機 IP</button>
         </div>
       </label>
-      <label>連接埠 <input id="port" type="text" placeholder="8001" /></label>
+      <label>個人連接埠(遊戲 API)
+        <span class="portrow"><input id="port" type="text" inputmode="numeric" autocomplete="off" /><span id="portWarn" class="portwarn"></span></span>
+      </label>
+      <label>聯機連接埠(多人對戰)
+        <span class="portrow"><input id="sessionPort" type="text" inputmode="numeric" autocomplete="off" /><span id="sessionPortWarn" class="portwarn"></span></span>
+      </label>
       <label>資源版本 <input id="resVersion" type="text" placeholder="1.4.54" /></label>
+
+      <details class="advanced">
+        <summary>進階設定</summary>
+        <label class="switchrow"><input type="checkbox" id="cloudCdn" /> 客戶端雲端下載資源 <span class="beta">測試 Beta</span></label>
+        <p class="hint">開啟後,客戶端改從雲端 CDN 直接下載遊戲資源,變更後需重新啟動伺服器。</p>
+      </details>
+
       <button id="save" class="primary">儲存</button>
       <span id="saveMsg" class="savemsg"></span>
     </section>
@@ -113,13 +126,34 @@
       <div id="apkOut" class="hint"></div>
     </section>
 
+    <!-- iOS 打包 -->
+    <section class="panel" id="ios">
+      <h2>打包重定向 IPA（iOS）</h2>
+      <div class="apk-target">重導目標:<b id="iosTarget">—</b></div>
+      <label>原始 IPA
+        <div class="row">
+          <input id="iosPath" type="text" placeholder="選擇 World Flipper 國服的 IPA" />
+          <button id="iosPick" class="mini">瀏覽</button>
+        </div>
+      </label>
+      <div class="row">
+        <button id="iosPatch" class="primary">開始打包</button>
+        <span id="iosMsg" class="savemsg"></span>
+      </div>
+      <div id="iosProgWrap" class="progwrap" style="display:none">
+        <div class="progbar"><div id="iosProgBar" class="progfill"></div></div>
+        <div id="iosProgText" class="progtext"></div>
+      </div>
+      <div id="iosOut" class="hint"></div>
+    </section>
+
     <!-- 管理面板 -->
     <section class="panel" id="admin">
       <div id="adminBlocked" class="blocked"><span class="bigword">未啟動</span></div>
       <div id="adminBody" class="admin-body">
         <nav class="subtabs">
-          <button class="subtab active" data-sub="players">玩家</button>
-          <button class="subtab" data-sub="accounts">帳號 / 存檔</button>
+          <button class="subtab active" data-sub="players">修改存檔</button>
+          <button class="subtab" data-sub="accounts">裝置</button>
           <button class="subtab" data-sub="time">伺服器時間</button>
           <button class="subtab" data-sub="mailtab">群發郵件</button>
         </nav>
@@ -152,14 +186,13 @@
           <div class="card">
             <h3>伺服器時間</h3>
             <p class="kv">目前:<b id="timeNow">—</b> <span id="timeCustom" class="badge"></span></p>
-            <label>設定時間 (ISO,如 2024-12-15T00:00:00)
+            <label>設定時間
               <div class="row">
-                <input id="timeInput" type="text" placeholder="2024-12-15T00:00:00" />
-                <button id="timeSet" class="primary">設定</button>
+                <input id="timePick" type="datetime-local" step="1" title="從日曆挑選日期時間" />
+                <button id="timeSet" class="primary">套用</button>
                 <button id="timeReset" class="mini">重置為系統時間</button>
               </div>
             </label>
-            <p class="hint">伺服器時間倒退會讓「隨時間累積」的值(如經驗池)歸零。</p>
           </div>
         </div>
 
@@ -183,7 +216,7 @@
               </select>
             </label>
             <div class="grid2">
-              <label id="mailTypeIdRow">附件 ID <input id="mailTypeId" type="text" placeholder="道具ID / 角色code / 裝備ID" /></label>
+              <label id="mailTypeIdRow">附件 ID <span class="row"><input id="mailTypeId" type="text" placeholder="道具ID / 角色code / 裝備ID" /><button type="button" class="mini" onclick="openMailPicker()">查表</button></span></label>
               <label>數量 <input id="mailNumber" type="text" value="1" /></label>
             </div>
             <p class="hint">只有「道具 / 角色 / 裝備」需要填附件 ID;其他資源類型直接填數量即可。角色 / 裝備每封數量固定 1。</p>
@@ -198,7 +231,12 @@
 
     <!-- 日誌(全部:伺服器 + 設定 / 打包 / 管理面板) -->
     <section class="panel" id="logs">
-      <div class="logbar"><span>全部日誌</span><button id="clearAllLog" class="mini">清空</button></div>
+      <div class="logbar"><span>全部日誌</span>
+        <span class="logbar-actions">
+          <button id="clearAllLog" class="mini">清空</button>
+          <label class="logtoggle" title="開啟後才會把完整日誌寫入 logs 資料夾(輪替壓縮,保留最後 9 個);關閉時只在此顯示,不佔磁碟"><input type="checkbox" id="debugLog"> 除錯模式</label>
+          <button id="openLogDir" class="mini" title="開啟 log 資料夾">資料夾</button>
+        </span></div>
       <pre id="allLogOut"></pre>
     </section>
   </main>
@@ -226,6 +264,18 @@
         <button id="portModalOk" class="primary">套用並啟動</button>
         <button id="portModalCancel" class="mini">取消</button>
       </div>
+    </div>
+  </div>
+
+  <!-- id→名稱 查表 picker(角色 / 道具 / 裝備),搜尋 + 點選填入 -->
+  <div id="pickerModal" class="modal" style="display:none">
+    <div class="modal-box picker-box">
+      <div class="picker-head">
+        <h3 id="pickerTitle">查表</h3>
+        <input id="pickerSearch" type="text" placeholder="搜尋名稱或 ID…" autocomplete="off" />
+        <button id="pickerClose" class="mini">關閉</button>
+      </div>
+      <div id="pickerList" class="picker-list"></div>
     </div>
   </div>
 

@@ -12,7 +12,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const wdfpData_1 = require("../../data/wdfpData");
+const item_1 = require("../../data/domains/item");
+const quest_1 = require("../../data/domains/quest");
+const player_1 = require("../../data/domains/player");
+const session_1 = require("../../data/domains/session");
 const activeAccount_1 = require("../../data/activeAccount");
 const assets_1 = require("../../lib/assets");
 const utils_1 = require("../../utils");
@@ -30,7 +33,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "message": "Invalid request body."
             });
         }
-        const session = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const session = yield (0, session_1.getSession)(viewerId.toString());
         if (!session) {
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -44,7 +47,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "message": "No player bound to account."
             });
         }
-        const player = (0, wdfpData_1.getPlayerSync)(playerId);
+        const player = (0, player_1.getPlayerSync)(playerId);
         if (player === null) {
             return reply.status(500).send({
                 "error": "Internal Server Error",
@@ -60,7 +63,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             });
         }
         // Check if already unlocked
-        const progress = (0, wdfpData_1.getPlayerQuestProgressSync)(playerId);
+        const progress = (0, quest_1.getPlayerQuestProgressSync)(playerId);
         const sectionProg = (_a = progress[String(category)]) !== null && _a !== void 0 ? _a : [];
         const existing = sectionProg.find(p => p.questId === questId);
         if (existing === null || existing === void 0 ? void 0 : existing.unlocked) {
@@ -76,23 +79,23 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             for (let i = 0; i < unlockCost.itemIds.length; i++) {
                 const itemId = unlockCost.itemIds[i];
                 const cost = (_b = unlockCost.itemCounts[i]) !== null && _b !== void 0 ? _b : 1;
-                const current = (_c = (0, wdfpData_1.getPlayerItemSync)(playerId, itemId)) !== null && _c !== void 0 ? _c : 0;
+                const current = (_c = (0, item_1.getPlayerItemSync)(playerId, itemId)) !== null && _c !== void 0 ? _c : 0;
                 if (current < cost) {
                     return reply.status(400).send({
                         "error": "Bad Request",
                         "message": `Not enough of item ${itemId} to unlock quest.`
                     });
                 }
-                (0, wdfpData_1.updatePlayerItemSync)(playerId, itemId, current - cost);
+                (0, item_1.updatePlayerItemSync)(playerId, itemId, current - cost);
                 itemList[String(itemId)] = current - cost;
             }
         }
         // Save unlock state
         if (existing) {
-            (0, wdfpData_1.updatePlayerQuestProgressSync)(playerId, category, { questId, unlocked: true });
+            (0, quest_1.updatePlayerQuestProgressSync)(playerId, category, { questId, unlocked: true });
         }
         else {
-            (0, wdfpData_1.insertPlayerQuestProgressSync)(playerId, category, { questId, finished: false, unlocked: true });
+            (0, quest_1.insertPlayerQuestProgressSync)(playerId, category, { questId, finished: false, unlocked: true });
         }
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({

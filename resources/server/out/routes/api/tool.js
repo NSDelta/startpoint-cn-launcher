@@ -10,7 +10,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const types_1 = require("../../data/types");
-const wdfpData_1 = require("../../data/wdfpData");
+const session_1 = require("../../data/domains/session");
+const player_1 = require("../../data/domains/player");
 const utils_1 = require("../../utils");
 const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
     fastify.post("/get_header_response", (request, reply) => {
@@ -37,7 +38,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Bad Request",
                 "message": "Invalid headers."
             });
-        const session = yield (0, wdfpData_1.getSession)(zat);
+        const session = yield (0, session_1.getSession)(zat);
         if (session === null || session.type !== types_1.SessionType.ZAT)
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -45,14 +46,14 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             });
         const accountId = session.accountId;
         // Create the player data if it doesn't exist.
-        const accountPlayer = (0, wdfpData_1.getPlayerFromAccountIdSync)(accountId);
+        const accountPlayer = (0, player_1.getPlayerFromAccountIdSync)(accountId);
         if (accountPlayer === null) {
             // create new player account
-            (0, wdfpData_1.insertDefaultPlayerSync)(accountId);
+            (0, player_1.insertDefaultPlayerSync)(accountId);
         }
         // generate viewer id
-        const viewerIds = yield (0, wdfpData_1.getAccountSessionsOfType)(accountId, types_1.SessionType.VIEWER);
-        const viewerId = !viewerIds[0] ? yield (0, wdfpData_1.generateViewerIdSession)(accountId) : viewerIds[0];
+        const viewerIds = yield (0, session_1.getAccountSessionsOfType)(accountId, types_1.SessionType.VIEWER);
+        const viewerId = !viewerIds[0] ? yield (0, session_1.generateViewerIdSession)(accountId) : viewerIds[0];
         reply.header("content-type", "application/x-msgpack");
         reply.status(200).send({
             "data_headers": (0, utils_1.generateDataHeaders)({

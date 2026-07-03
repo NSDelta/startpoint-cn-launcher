@@ -9,7 +9,10 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const wdfpData_1 = require("../../data/wdfpData");
+const mail_1 = require("../../data/domains/mail");
+const player_1 = require("../../data/domains/player");
+const tutorial_1 = require("../../data/domains/tutorial");
+const session_1 = require("../../data/domains/session");
 const activeAccount_1 = require("../../data/activeAccount");
 const utils_1 = require("../../utils");
 const assets_1 = require("../../lib/assets");
@@ -28,7 +31,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Bad Request",
                 "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -42,10 +45,10 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "message": "No players bound to account."
             });
         // Mark tutorial as having been completed (skip already triggered)
-        const existing = (0, wdfpData_1.getPlayerTriggeredTutorialsSync)(playerId);
+        const existing = (0, tutorial_1.getPlayerTriggeredTutorialsSync)(playerId);
         for (const tutorialId of tutorialIds) {
             if (!existing.find((v) => v === tutorialId)) {
-                (0, wdfpData_1.insertPlayerTriggeredTutorialSync)(playerId, tutorialId);
+                (0, tutorial_1.insertPlayerTriggeredTutorialSync)(playerId, tutorialId);
             }
         }
         reply.header("content-type", "application/x-msgpack");
@@ -66,7 +69,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Bad Request",
                 "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -74,14 +77,14 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             });
         // get player
         const playerId = (0, activeAccount_1.resolvePlayerIdSync)(viewerIdSession.accountId);
-        const player = playerId !== null ? (0, wdfpData_1.getPlayerSync)(playerId) : null;
+        const player = playerId !== null ? (0, player_1.getPlayerSync)(playerId) : null;
         if (player === null)
             return reply.status(500).send({
                 "error": "Internal Server Error",
                 "message": "No player bound to account."
             });
         // check if tutorial is already completed
-        const completedTutorial = (0, wdfpData_1.getPlayerTriggeredTutorialsSync)(playerId);
+        const completedTutorial = (0, tutorial_1.getPlayerTriggeredTutorialsSync)(playerId);
         if (completedTutorial.find((value) => value === 12))
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -95,7 +98,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Bad Request",
                 "message": "Attempt to redo previous tutorial step."
             });
-        (0, wdfpData_1.updatePlayerSync)({
+        (0, player_1.updatePlayerSync)({
             id: playerId,
             tutorialStep: nextStep,
             tutorialSkipFlag: skip,
@@ -121,9 +124,9 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             const drawResult = [randomCharacterId];
             // reward pull
             const rewardResult = (0, gacha_1.rewardPlayerGachaDrawResultSync)(playerId, gachaData, drawResult);
-            (0, wdfpData_1.insertReceiveHistorySync)(playerId, { type: wdfpData_1.MailType.CHARACTER, type_id: randomCharacterId, number: 1 });
+            (0, mail_1.insertReceiveHistorySync)(playerId, { type: mail_1.MailType.CHARACTER, type_id: randomCharacterId, number: 1 });
             const newFreeVmoney = player.freeVmoney - gachaData.singleCost;
-            (0, wdfpData_1.updatePlayerSync)({
+            (0, player_1.updatePlayerSync)({
                 id: playerId,
                 freeVmoney: newFreeVmoney,
                 tutorialGachaCharacterId: randomCharacterId
@@ -159,21 +162,21 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         else if (nextStep === 16) {
             // give 1500 vmoney
             const newVMoney = player.freeVmoney + 1500;
-            (0, wdfpData_1.updatePlayerSync)({
+            (0, player_1.updatePlayerSync)({
                 id: playerId,
                 freeVmoney: newVMoney
             });
-            (0, wdfpData_1.insertReceiveHistorySync)(playerId, { type: wdfpData_1.MailType.FREE_VMONEY, type_id: null, number: 1500 });
+            (0, mail_1.insertReceiveHistorySync)(playerId, { type: mail_1.MailType.FREE_VMONEY, type_id: null, number: 1500 });
             // give free character directly (required for tutorial popup)
             const giveResult = (0, character_1.givePlayerCharacterSync)(playerId, freeTutorialCharacterId);
             const characterList = giveResult !== null ? [giveResult.character] : [];
-            (0, wdfpData_1.insertReceiveHistorySync)(playerId, { type: wdfpData_1.MailType.CHARACTER, type_id: freeTutorialCharacterId, number: 1 });
+            (0, mail_1.insertReceiveHistorySync)(playerId, { type: mail_1.MailType.CHARACTER, type_id: freeTutorialCharacterId, number: 1 });
             // also send a mail with tutorial gift (gacha ticket, etc.)
-            (0, wdfpData_1.insertMailSync)(playerId, {
+            (0, mail_1.insertMailSync)(playerId, {
                 reason_id: 0,
                 subject: null,
                 description: null,
-                type: wdfpData_1.MailType.FREE_VMONEY,
+                type: mail_1.MailType.FREE_VMONEY,
                 type_id: null,
                 number: 500,
                 receive_time: '0000-00-00 00:00:00',

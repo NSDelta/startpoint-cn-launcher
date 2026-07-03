@@ -5,7 +5,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.givePlayerRewardSync = exports.givePlayerRewardsSync = exports.givePlayerScoreRewardsSync = void 0;
 const crypto_1 = require("crypto");
-const wdfpData_1 = require("../data/wdfpData");
+const player_1 = require("../data/domains/player");
+const item_1 = require("../data/domains/item");
 const assets_1 = require("./assets");
 const character_1 = require("./character");
 const equipment_1 = require("./equipment");
@@ -61,26 +62,28 @@ function givePlayerScoreRewardsSync(playerId, groupId, scoreRewards, boostPointU
                             const itemReward = reward;
                             const itemId = itemReward.id;
                             rewardAmount = itemReward.count * dropMultiplier * (boostPointUsed ? 2 : 1);
-                            items[String(itemId)] = (0, wdfpData_1.givePlayerItemSync)(playerId, itemId, rewardAmount);
+                            items[String(itemId)] = (0, item_1.givePlayerItemSync)(playerId, itemId, rewardAmount);
+                            console.log(`[QUEST-ITEM] id=${itemId} cdnCount=${itemReward.count} ×drop=${dropMultiplier} ×boost=${boostPointUsed ? 2 : 1} → ${rewardAmount}`);
                             break;
                         }
                         case types_1.RewardType.MANA: {
-                            const player = (0, wdfpData_1.getPlayerSync)(playerId);
+                            const player = (0, player_1.getPlayerSync)(playerId);
                             const currencyReward = reward;
                             rewardAmount = currencyReward.count * dropMultiplier * (boostPointUsed ? 2 : 1);
                             mana += rewardAmount;
-                            (0, wdfpData_1.updatePlayerSync)({
+                            (0, player_1.updatePlayerSync)({
                                 id: playerId,
-                                freeMana: ((player === null || player === void 0 ? void 0 : player.freeMana) || 0) + rewardAmount
+                                freeMana: ((player === null || player === void 0 ? void 0 : player.freeMana) || 0) + rewardAmount,
+                                totalManaObtained: ((player === null || player === void 0 ? void 0 : player.totalManaObtained) || 0) + rewardAmount
                             });
                             break;
                         }
                         case types_1.RewardType.EXP: {
-                            const player = (0, wdfpData_1.getPlayerSync)(playerId);
+                            const player = (0, player_1.getPlayerSync)(playerId);
                             const currencyReward = reward;
                             rewardAmount = currencyReward.count * dropMultiplier * (boostPointUsed ? 2 : 1);
                             expPool += rewardAmount;
-                            (0, wdfpData_1.updatePlayerSync)({
+                            (0, player_1.updatePlayerSync)({
                                 id: playerId,
                                 expPool: ((player === null || player === void 0 ? void 0 : player.expPool) || 0) + rewardAmount
                             });
@@ -90,14 +93,16 @@ function givePlayerScoreRewardsSync(playerId, groupId, scoreRewards, boostPointU
                             const itemReward = reward;
                             const itemId = resolveElementItemId(itemReward.id, questElement);
                             rewardAmount = itemReward.count * dropMultiplier * (boostPointUsed ? 2 : 1);
-                            items[String(itemId)] = (0, wdfpData_1.givePlayerItemSync)(playerId, itemId, rewardAmount);
+                            items[String(itemId)] = (0, item_1.givePlayerItemSync)(playerId, itemId, rewardAmount);
+                            console.log(`[QUEST-ELEMENT] rarity=${itemReward.id} →id=${itemId} cdnCount=${itemReward.count} ×drop=${dropMultiplier} ×boost=${boostPointUsed ? 2 : 1} → ${rewardAmount}`);
                             break;
                         }
                         case types_1.RewardType.AETHER: {
                             const itemReward = reward;
                             const itemId = resolveAetherItemId(itemReward.id, questElement);
                             rewardAmount = itemReward.count * dropMultiplier * (boostPointUsed ? 2 : 1);
-                            items[String(itemId)] = (0, wdfpData_1.givePlayerItemSync)(playerId, itemId, rewardAmount);
+                            items[String(itemId)] = (0, item_1.givePlayerItemSync)(playerId, itemId, rewardAmount);
+                            console.log(`[QUEST-AETHER] rarity=${itemReward.id} →id=${itemId} cdnCount=${itemReward.count} ×drop=${dropMultiplier} ×boost=${boostPointUsed ? 2 : 1} → ${rewardAmount}`);
                             break;
                         }
                     }
@@ -128,15 +133,10 @@ function givePlayerScoreRewardsSync(playerId, groupId, scoreRewards, boostPointU
                                 joinedCharacterIdList = [...joinedCharacterIdList, ...result.joined_character_id_list];
                                 characterList = [...characterList, ...result.character_list];
                                 equipmentList = [...equipmentList, ...result.equipment_list];
-                                // merge items
+                                // merge items: RARE_POOL result.items already contains DB totals
+                                // (includes any earlier ITEM path writes), so just use latest value
                                 for (const [itemId, count] of Object.entries(result.items)) {
-                                    const existingCount = items[itemId];
-                                    if (existingCount === undefined) {
-                                        items[itemId] = count;
-                                    }
-                                    else {
-                                        items[itemId] = existingCount + count;
-                                    }
+                                    items[itemId] = count;
                                 }
                                 // calculate number
                                 let number = 0;
@@ -169,6 +169,9 @@ function givePlayerScoreRewardsSync(playerId, groupId, scoreRewards, boostPointU
                 }
             }
         }
+    }
+    if (Object.keys(items).length > 0) {
+        console.log(`[QUEST-BAG] total items bagged: ${JSON.stringify(items)}`);
     }
     return {
         drop_score_reward_ids: dropScoreRewardIds,
@@ -206,7 +209,7 @@ function givePlayerRewardsSync(playerId, rewards) {
             case types_1.RewardType.ITEM: {
                 const convertedReward = reward;
                 const itemId = convertedReward.id;
-                const result = (0, wdfpData_1.givePlayerItemSync)(playerId, itemId, convertedReward.count);
+                const result = (0, item_1.givePlayerItemSync)(playerId, itemId, convertedReward.count);
                 items.set(itemId, ((_a = items.get(itemId)) !== null && _a !== void 0 ? _a : 0) + result);
                 break;
             }
@@ -247,7 +250,7 @@ function givePlayerRewardsSync(playerId, rewards) {
             case types_1.RewardType.AETHER: {
                 const convertedReward = reward;
                 const itemId = convertedReward.id;
-                const result = (0, wdfpData_1.givePlayerItemSync)(playerId, itemId, convertedReward.count);
+                const result = (0, item_1.givePlayerItemSync)(playerId, itemId, convertedReward.count);
                 items.set(itemId, ((_c = items.get(itemId)) !== null && _c !== void 0 ? _c : 0) + result);
                 break;
             }
@@ -255,14 +258,15 @@ function givePlayerRewardsSync(playerId, rewards) {
     }
     if (mana > 0 || vmoney > 0 || expPool > 0) {
         // get player
-        const player = (0, wdfpData_1.getPlayerSync)(playerId);
+        const player = (0, player_1.getPlayerSync)(playerId);
         if (player === null)
             return null;
-        (0, wdfpData_1.updatePlayerSync)({
+        (0, player_1.updatePlayerSync)({
             id: playerId,
             freeVmoney: player.freeVmoney + vmoney,
             freeMana: player.freeMana + mana,
-            expPool: player.expPool + expPool
+            expPool: player.expPool + expPool,
+            totalManaObtained: (player.totalManaObtained || 0) + mana
         });
     }
     // build return values

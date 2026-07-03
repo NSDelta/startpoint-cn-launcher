@@ -10,9 +10,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const wdfpData_1 = require("../../data/wdfpData");
-const character_1 = require("./character");
-const character_2 = require("../../lib/character");
+const character_1 = require("../../data/domains/character");
+const item_1 = require("../../data/domains/item");
+const player_1 = require("../../data/domains/player");
+const session_1 = require("../../data/domains/session");
+const character_2 = require("./character");
+const character_3 = require("../../lib/character");
 const utils_1 = require("../../utils");
 const assets_1 = require("../../lib/assets");
 const utils_2 = require("../../data/utils");
@@ -43,7 +46,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Bad Request",
                 "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -51,7 +54,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             });
         // get player
         const playerId = (0, activeAccount_1.resolvePlayerIdSync)(viewerIdSession.accountId);
-        const player = playerId !== null ? (0, wdfpData_1.getPlayerSync)(playerId) : null;
+        const player = playerId !== null ? (0, player_1.getPlayerSync)(playerId) : null;
         if (player === null)
             return reply.status(500).send({
                 "error": "Internal Server Error",
@@ -65,7 +68,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "message": "Character does not exist."
             });
         // get character
-        const character = (0, wdfpData_1.getPlayerCharacterSync)(playerId, characterId);
+        const character = (0, character_1.getPlayerCharacterSync)(playerId, characterId);
         if (character === null)
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -83,12 +86,12 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         const increaseItemCount = rarityStackConvertItemCount[rarity] * convertCount;
         const afterExp = player.expPool + increaseExp;
         // update player
-        (0, wdfpData_1.updatePlayerSync)({
+        (0, player_1.updatePlayerSync)({
             id: playerId,
             expPool: afterExp
         });
         // add item
-        const afterItemCount = (0, wdfpData_1.givePlayerItemSync)(playerId, rewardItemId, increaseItemCount);
+        const afterItemCount = (0, item_1.givePlayerItemSync)(playerId, rewardItemId, increaseItemCount);
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({
             "data_headers": (0, utils_1.generateDataHeaders)({
@@ -130,20 +133,20 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Bad Request",
                 "message": "Invalid request body."
             });
-        const session = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const session = yield (0, session_1.getSession)(viewerId.toString());
         if (!session)
             return reply.status(400).send({
                 "error": "Bad Request",
                 "message": "Invalid viewer id."
             });
         const playerId = (0, activeAccount_1.resolvePlayerIdSync)(session.accountId);
-        const player = playerId !== null ? (0, wdfpData_1.getPlayerSync)(playerId) : null;
+        const player = playerId !== null ? (0, player_1.getPlayerSync)(playerId) : null;
         if (player === null)
             return reply.status(500).send({
                 "error": "Internal Server Error",
                 "message": "No players bound to account."
             });
-        const allCharacters = (0, wdfpData_1.getPlayerCharactersSync)(playerId);
+        const allCharacters = (0, character_1.getPlayerCharactersSync)(playerId);
         const modifiedCharacters = [];
         let totalExp = 0;
         let totalStarGrains = 0;
@@ -156,7 +159,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             if (!charAsset)
                 continue;
             const rarity = charAsset.rarity;
-            const maxOver = (_a = character_1.characterMaxOverLimits[rarity]) !== null && _a !== void 0 ? _a : 0;
+            const maxOver = (_a = character_2.characterMaxOverLimits[rarity]) !== null && _a !== void 0 ? _a : 0;
             if (character.overLimitStep < maxOver)
                 continue;
             const stack = character.stack;
@@ -164,7 +167,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             const addStarGrain = ((_c = rarityStackConvertItemCount[rarity]) !== null && _c !== void 0 ? _c : 0) * stack;
             totalExp += addExp;
             totalStarGrains += addStarGrain;
-            (0, wdfpData_1.updatePlayerCharacterSync)(playerId, characterId, { stack: 0 });
+            (0, character_1.updatePlayerCharacterSync)(playerId, characterId, { stack: 0 });
             character.stack = 0;
             modifiedCharacters.push({
                 "viewer_id": viewerId,
@@ -186,7 +189,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "data": {
                     "character_list": [],
                     "converted_exp_info": { "add_exp": 0 },
-                    "item_list": (0, wdfpData_1.getPlayerItemsSync)(playerId),
+                    "item_list": (0, item_1.getPlayerItemsSync)(playerId),
                     "user_info": {
                         "exp_pool": player.expPool,
                         "exp_pooled_time": (0, utils_1.getServerTime)(player.expPooledTime)
@@ -196,12 +199,12 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             });
         }
         const newExpPool = player.expPool + totalExp;
-        (0, wdfpData_1.updatePlayerSync)({ id: playerId, expPool: newExpPool });
+        (0, player_1.updatePlayerSync)({ id: playerId, expPool: newExpPool });
         let newStarGrainTotal = 0;
         if (totalStarGrains > 0) {
-            newStarGrainTotal = (0, wdfpData_1.givePlayerItemSync)(playerId, rewardItemId, totalStarGrains);
+            newStarGrainTotal = (0, item_1.givePlayerItemSync)(playerId, rewardItemId, totalStarGrains);
         }
-        const items = (0, wdfpData_1.getPlayerItemsSync)(playerId);
+        const items = (0, item_1.getPlayerItemsSync)(playerId);
         if (totalStarGrains > 0) {
             items[String(rewardItemId)] = newStarGrainTotal;
         }
@@ -229,7 +232,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Bad Request",
                 "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -237,7 +240,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             });
         // get player
         const playerId = (0, activeAccount_1.resolvePlayerIdSync)(viewerIdSession.accountId);
-        const player = playerId !== null ? (0, wdfpData_1.getPlayerSync)(playerId) : null;
+        const player = playerId !== null ? (0, player_1.getPlayerSync)(playerId) : null;
         if (player === null)
             return reply.status(500).send({
                 "error": "Internal Server Error",
@@ -245,7 +248,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             });
         // increase character exp
         const characterId = body.character_id;
-        const character = (0, wdfpData_1.getPlayerCharacterSync)(playerId, characterId);
+        const character = (0, character_1.getPlayerCharacterSync)(playerId, characterId);
         if (character === null)
             return reply.status(400).send({
                 "error": "Internal Server Error",
@@ -261,12 +264,12 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             });
         const playerAfterExpPool = player.expPool - addExp;
         // decrease player exp
-        (0, wdfpData_1.updatePlayerSync)({
+        (0, player_1.updatePlayerSync)({
             id: playerId,
             expPool: playerAfterExpPool
         });
         // add exp to the character
-        const rewardResult = (0, character_2.givePlayerCharactersExpSync)(playerId, [characterId], addExp, false);
+        const rewardResult = (0, character_3.givePlayerCharactersExpSync)(playerId, [characterId], addExp, false);
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({
             "data_headers": (0, utils_1.generateDataHeaders)({

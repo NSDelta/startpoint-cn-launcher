@@ -9,7 +9,10 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const wdfpData_1 = require("../../data/wdfpData");
+const rushEvent_1 = require("../../data/domains/rushEvent");
+const character_1 = require("../../data/domains/character");
+const party_1 = require("../../data/domains/party");
+const session_1 = require("../../data/domains/session");
 const activeAccount_1 = require("../../data/activeAccount");
 const utils_1 = require("../../utils");
 const types_1 = require("../../data/types");
@@ -34,7 +37,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid viewer id."
@@ -45,12 +48,12 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Internal Server Error", "message": "No player bound to account."
             });
         // Rush event data for played party tracking
-        let rushEventData = (0, wdfpData_1.getPlayerRushEventSync)(playerId, eventId);
+        let rushEventData = (0, rushEvent_1.getPlayerRushEventSync)(playerId, eventId);
         if (rushEventData === null) {
-            rushEventData = (0, wdfpData_1.getDefaultPlayerRushEventSync)(eventId);
-            (0, wdfpData_1.insertPlayerRushEventSync)(playerId, rushEventData);
+            rushEventData = (0, rushEvent_1.getDefaultPlayerRushEventSync)(eventId);
+            (0, rushEvent_1.insertPlayerRushEventSync)(playerId, rushEventData);
         }
-        const clearedFolderIdList = (0, wdfpData_1.getPlayerRushEventClearedFoldersSync)(playerId, eventId);
+        const clearedFolderIdList = (0, rushEvent_1.getPlayerRushEventClearedFoldersSync)(playerId, eventId);
         const serializedPlayedParties = (0, rush_1.getSerializedPlayerRushEventPlayedPartiesSync)(playerId, eventId);
         console.log(`[RAID] summary: folderParties=${Object.keys((_a = serializedPlayedParties.folderParties) !== null && _a !== void 0 ? _a : {}).length} endlessParties=${Object.keys((_b = serializedPlayedParties.endlessParties) !== null && _b !== void 0 ? _b : {}).length}`);
         reply.header("content-type", "application/x-msgpack");
@@ -117,7 +120,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid viewer id."
@@ -128,17 +131,17 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Internal Server Error", "message": "No player bound to account."
             });
         // Read from EVENT (dedicated party set), first time copy from NORMAL
-        let playerPartyGroups = (0, wdfpData_1.getPlayerPartyGroupListSync)(playerId, types_1.PartyCategory.EVENT);
+        let playerPartyGroups = (0, party_1.getPlayerPartyGroupListSync)(playerId, types_1.PartyCategory.EVENT);
         if (Object.keys(playerPartyGroups).length === 0) {
             console.log(`[RAID] party: no EVENT groups, copying from NORMAL`);
-            playerPartyGroups = (0, wdfpData_1.getPlayerPartyGroupListSync)(playerId, types_1.PartyCategory.NORMAL);
+            playerPartyGroups = (0, party_1.getPlayerPartyGroupListSync)(playerId, types_1.PartyCategory.NORMAL);
             for (const group of Object.values(playerPartyGroups)) {
                 for (const party of Object.values(group.list)) {
                     party.category = types_1.PartyCategory.EVENT;
                 }
                 group.category = types_1.PartyCategory.EVENT;
             }
-            (0, wdfpData_1.insertPlayerPartyGroupListSync)(playerId, playerPartyGroups);
+            (0, party_1.insertPlayerPartyGroupListSync)(playerId, playerPartyGroups);
         }
         const group1 = playerPartyGroups['1'];
         const partyList = [];
@@ -163,7 +166,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         // Fallback: fill empty parties with leader characters if NORMAL is empty
         while (partyList.length < 3) {
             const pid = partyList.length + 1;
-            const playerChars = (0, wdfpData_1.getPlayerCharactersSync)(playerId);
+            const playerChars = (0, character_1.getPlayerCharactersSync)(playerId);
             const leaderIds = Object.keys(playerChars).map(Number).filter(id => id > 0).sort((a, b) => a - b);
             const usedIds = new Set(partyList.flatMap(p => p.character_ids.filter(c => c !== null)));
             const leaderId = (_c = leaderIds.find(id => !usedIds.has(id))) !== null && _c !== void 0 ? _c : null;
@@ -239,7 +242,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid viewer id."
@@ -276,7 +279,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid viewer id."
@@ -286,7 +289,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             return reply.status(500).send({
                 "error": "Internal Server Error", "message": "No player bound to account."
             });
-        (0, wdfpData_1.updatePlayerRushEventSync)(playerId, { eventId: body.event_id, activeRushBattleFolderId: body.folder_id });
+        (0, rushEvent_1.updatePlayerRushEventSync)(playerId, { eventId: body.event_id, activeRushBattleFolderId: body.folder_id });
         raidEventIds[playerId] = body.event_id;
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({ "data_headers": (0, utils_1.generateDataHeaders)({ viewer_id: viewerId }), "data": {} });
@@ -304,7 +307,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid viewer id."
@@ -316,19 +319,19 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             });
         if (questType === ResetQuestType.FOLDER) {
             if (resetTargetId !== undefined) {
-                (0, wdfpData_1.deletePlayerRushEventPlayedPartiesUntilSync)(playerId, eventId, types_1.RushEventBattleType.FOLDER, resetTargetId);
+                (0, rushEvent_1.deletePlayerRushEventPlayedPartiesUntilSync)(playerId, eventId, types_1.RushEventBattleType.FOLDER, resetTargetId);
             }
             else {
-                (0, wdfpData_1.updatePlayerRushEventSync)(playerId, { eventId: eventId, activeRushBattleFolderId: null });
-                (0, wdfpData_1.deletePlayerRushEventPlayedPartyListSync)(playerId, eventId, types_1.RushEventBattleType.FOLDER);
+                (0, rushEvent_1.updatePlayerRushEventSync)(playerId, { eventId: eventId, activeRushBattleFolderId: null });
+                (0, rushEvent_1.deletePlayerRushEventPlayedPartyListSync)(playerId, eventId, types_1.RushEventBattleType.FOLDER);
             }
         }
         else if (resetTargetId !== undefined) {
             if (isResetAfterTargetRound) {
-                (0, wdfpData_1.deletePlayerRushEventPlayedPartiesUntilSync)(playerId, eventId, types_1.RushEventBattleType.ENDLESS, resetTargetId);
+                (0, rushEvent_1.deletePlayerRushEventPlayedPartiesUntilSync)(playerId, eventId, types_1.RushEventBattleType.ENDLESS, resetTargetId);
             }
             else {
-                (0, wdfpData_1.deletePlayerRushEventPlayedPartySync)(playerId, eventId, resetTargetId, types_1.RushEventBattleType.ENDLESS);
+                (0, rushEvent_1.deletePlayerRushEventPlayedPartySync)(playerId, eventId, resetTargetId, types_1.RushEventBattleType.ENDLESS);
             }
         }
         reply.header("content-type", "application/x-msgpack");

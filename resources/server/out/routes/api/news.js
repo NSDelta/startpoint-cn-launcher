@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const wdfpData_1 = require("../../data/wdfpData");
+const session_1 = require("../../data/domains/session");
 const utils_1 = require("../../utils");
 const fs_1 = require("fs");
 const path_1 = __importDefault(require("path"));
@@ -46,7 +46,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 error: "Bad Request",
                 message: "Invalid request body."
             });
-        const session = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const session = yield (0, session_1.getSession)(viewerId.toString());
         if (!session)
             return reply.status(400).send({
                 error: "Bad Request",
@@ -85,7 +85,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 error: "Bad Request",
                 message: "Invalid request body."
             });
-        const session = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const session = yield (0, session_1.getSession)(viewerId.toString());
         if (!session)
             return reply.status(400).send({
                 error: "Bad Request",
@@ -119,7 +119,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         const viewerId = body.viewer_id;
         if (!viewerId || isNaN(viewerId))
             return reply.status(400).send({ error: "Bad Request", message: "Invalid request body." });
-        const session = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const session = yield (0, session_1.getSession)(viewerId.toString());
         if (!session)
             return reply.status(400).send({ error: "Bad Request", message: "Invalid viewer id." });
         reply.header("content-type", "application/x-msgpack");
@@ -134,7 +134,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         const viewerId = body.viewer_id;
         if (!viewerId || isNaN(viewerId))
             return reply.status(400).send({ error: "Bad Request", message: "Invalid request body." });
-        const session = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const session = yield (0, session_1.getSession)(viewerId.toString());
         if (!session)
             return reply.status(400).send({ error: "Bad Request", message: "Invalid viewer id." });
         reply.header("content-type", "application/x-msgpack");
@@ -149,7 +149,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         const viewerId = body.viewer_id;
         if (!viewerId || isNaN(viewerId))
             return reply.status(400).send({ error: "Bad Request", message: "Invalid request body." });
-        const session = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const session = yield (0, session_1.getSession)(viewerId.toString());
         if (!session)
             return reply.status(400).send({ error: "Bad Request", message: "Invalid viewer id." });
         reply.header("content-type", "application/x-msgpack");
@@ -164,7 +164,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         const viewerId = body.viewer_id;
         if (!viewerId || isNaN(viewerId))
             return reply.status(400).send({ error: "Bad Request", message: "Invalid request body." });
-        const session = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const session = yield (0, session_1.getSession)(viewerId.toString());
         if (!session)
             return reply.status(400).send({ error: "Bad Request", message: "Invalid viewer id." });
         reply.header("content-type", "application/x-msgpack");

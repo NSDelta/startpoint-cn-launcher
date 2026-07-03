@@ -9,9 +9,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const wdfpData_1 = require("../../data/wdfpData");
+const mail_1 = require("../../data/domains/mail");
+const gacha_1 = require("../../data/domains/gacha");
+const item_1 = require("../../data/domains/item");
+const player_1 = require("../../data/domains/player");
+const session_1 = require("../../data/domains/session");
 const utils_1 = require("../../utils");
-const gacha_1 = require("../../lib/gacha");
+const gacha_2 = require("../../lib/gacha");
 const assets_1 = require("../../lib/assets");
 const types_1 = require("../../lib/types");
 const utils_2 = require("../../data/utils");
@@ -56,7 +60,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Bad Request",
                 "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -70,7 +74,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "message": "No players bound to account."
             });
         // get gacha info
-        const gachaInfo = (0, wdfpData_1.getPlayerGachaInfoSync)(playerId, gachaId);
+        const gachaInfo = (0, gacha_1.getPlayerGachaInfoSync)(playerId, gachaId);
         if (gachaInfo === null)
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -84,9 +88,9 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             });
         // reward equipment
         const giveResult = (0, equipment_1.givePlayerEquipmentSync)(playerId, equipmentId, 1);
-        (0, wdfpData_1.insertReceiveHistorySync)(playerId, { type: wdfpData_1.MailType.EQUIPMENT, type_id: equipmentId, number: 1 });
+        (0, mail_1.insertReceiveHistorySync)(playerId, { type: mail_1.MailType.EQUIPMENT, type_id: equipmentId, number: 1 });
         // update gacha info
-        (0, wdfpData_1.updatePlayerGachaInfoSync)(playerId, {
+        (0, gacha_1.updatePlayerGachaInfoSync)(playerId, {
             gachaId: gachaId,
             gachaExchangePoint: newExchangePoints
         });
@@ -123,7 +127,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Bad Request",
                 "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -137,7 +141,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "message": "No players bound to account."
             });
         // get gacha info
-        const gachaInfo = (0, wdfpData_1.getPlayerGachaInfoSync)(playerId, gachaId);
+        const gachaInfo = (0, gacha_1.getPlayerGachaInfoSync)(playerId, gachaId);
         if (gachaInfo === null)
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -156,9 +160,9 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Bad Request",
                 "message": "Could not give player character."
             });
-        (0, wdfpData_1.insertReceiveHistorySync)(playerId, { type: wdfpData_1.MailType.CHARACTER, type_id: characterId, number: 1 });
+        (0, mail_1.insertReceiveHistorySync)(playerId, { type: mail_1.MailType.CHARACTER, type_id: characterId, number: 1 });
         // update gacha info
-        (0, wdfpData_1.updatePlayerGachaInfoSync)(playerId, {
+        (0, gacha_1.updatePlayerGachaInfoSync)(playerId, {
             gachaId: gachaId,
             gachaExchangePoint: newExchangePoints
         });
@@ -202,7 +206,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "message": "Invalid request body."
             });
         }
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -212,7 +216,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         const playerId = (0, activeAccount_1.resolvePlayerIdSync)(viewerIdSession.accountId);
         if (playerId === null)
             return reply.status(500).send({ "error": "Internal Server Error", "message": "No players bound to account." });
-        const player = (0, wdfpData_1.getPlayerSync)(playerId);
+        const player = (0, player_1.getPlayerSync)(playerId);
         if (player === null)
             return;
         // get the gacha
@@ -226,7 +230,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         }
         const isCharacterGacha = gachaData.type == types_1.GachaType.CHARACTER;
         // get player gacha data
-        let playerGachaData = (0, wdfpData_1.getPlayerGachaInfoSync)(playerId, gachaId);
+        let playerGachaData = (0, gacha_1.getPlayerGachaInfoSync)(playerId, gachaId);
         const insertPlayerGachaData = playerGachaData === null;
         playerGachaData = playerGachaData !== null && playerGachaData !== void 0 ? playerGachaData : {
             gachaId: gachaId,
@@ -266,7 +270,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 const isWeapon = type === GachaExecType.MULTI_WEAPON_TICKET;
                 const isMulti = type === GachaExecType.MULTI_TICKET || isWeapon;
                 const itemId = isMulti ? (isWeapon ? 999004 : 999001) : (isWeapon ? 999005 : 999003);
-                const itemCount = (0, wdfpData_1.getPlayerItemSync)(playerId, itemId);
+                const itemCount = (0, item_1.getPlayerItemSync)(playerId, itemId);
                 const useTicketCount = Math.max(1, numberOfExec);
                 const newItemCount = (itemCount !== null && itemCount !== void 0 ? itemCount : -1) - useTicketCount;
                 if (0 > newItemCount)
@@ -276,7 +280,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                     });
                 pullCount = useTicketCount * (isMulti ? 10 : 1);
                 items[itemId] = newItemCount;
-                (0, wdfpData_1.updatePlayerItemSync)(playerId, itemId, newItemCount);
+                (0, item_1.updatePlayerItemSync)(playerId, itemId, newItemCount);
                 break;
             }
             // free pulls
@@ -288,7 +292,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                         "message": "No gacha campaign assigned to gacha."
                     });
                 // get player campaign data
-                let playerCampaignData = (0, wdfpData_1.getPlayerGachaCampaignSync)(playerId, gachaId, gachaCampaignId);
+                let playerCampaignData = (0, gacha_1.getPlayerGachaCampaignSync)(playerId, gachaId, gachaCampaignId);
                 const insertCampaignData = playerCampaignData === null;
                 playerCampaignData = playerCampaignData !== null && playerCampaignData !== void 0 ? playerCampaignData : {
                     gachaId: gachaId,
@@ -303,10 +307,10 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 // update campaign
                 playerCampaignData.count = 0;
                 if (insertCampaignData) {
-                    (0, wdfpData_1.insertPlayerGachaCampaignSync)(playerId, playerCampaignData);
+                    (0, gacha_1.insertPlayerGachaCampaignSync)(playerId, playerCampaignData);
                 }
                 else {
-                    (0, wdfpData_1.updatePlayerGachaCampaignSync)(playerId, gachaId, gachaCampaignId, 0);
+                    (0, gacha_1.updatePlayerGachaCampaignSync)(playerId, gachaId, gachaCampaignId, 0);
                 }
                 gachaCampaigns.push((0, utils_2.serializeGachaCampaign)(playerCampaignData));
                 const isMulti = type === GachaExecType.CAMPAIGN_MULTI;
@@ -328,29 +332,29 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "message": "Not enough beads."
             });
         }
-        const drawResult = (0, gacha_1.drawGachaSync)(gachaData, pullCount);
-        const rewardResult = (0, gacha_1.rewardPlayerGachaDrawResultSync)(playerId, gachaData, drawResult);
+        const drawResult = (0, gacha_2.drawGachaSync)(gachaData, pullCount);
+        const rewardResult = (0, gacha_2.rewardPlayerGachaDrawResultSync)(playerId, gachaData, drawResult);
         // Log each drawn item in history
-        const historyType = isCharacterGacha ? wdfpData_1.MailType.CHARACTER : wdfpData_1.MailType.EQUIPMENT;
+        const historyType = isCharacterGacha ? mail_1.MailType.CHARACTER : mail_1.MailType.EQUIPMENT;
         for (const itemId of drawResult) {
-            (0, wdfpData_1.insertReceiveHistorySync)(playerId, { type: historyType, type_id: itemId, number: 1 });
+            (0, mail_1.insertReceiveHistorySync)(playerId, { type: historyType, type_id: itemId, number: 1 });
         }
         const newGachaExchangePoint = ((_c = playerGachaData.gachaExchangePoint) !== null && _c !== void 0 ? _c : 0) + pullCount;
         if (insertPlayerGachaData) {
             playerGachaData.isAccountFirst = false;
             playerGachaData.isDailyFirst = false;
             playerGachaData.gachaExchangePoint = newGachaExchangePoint;
-            (0, wdfpData_1.insertPlayerGachaInfoSync)(playerId, playerGachaData);
+            (0, gacha_1.insertPlayerGachaInfoSync)(playerId, playerGachaData);
         }
         else {
-            (0, wdfpData_1.updatePlayerGachaInfoSync)(playerId, {
+            (0, gacha_1.updatePlayerGachaInfoSync)(playerId, {
                 gachaId: gachaId,
                 isDailyFirst: false,
                 isAccountFirst: false,
                 gachaExchangePoint: newGachaExchangePoint
             });
         }
-        (0, wdfpData_1.updatePlayerSync)({
+        (0, player_1.updatePlayerSync)({
             id: playerId,
             vmoney: playerPaidVmoney,
             freeVmoney: playerFreeVmoney

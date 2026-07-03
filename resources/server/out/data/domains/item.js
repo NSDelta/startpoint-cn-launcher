@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.givePlayerItemSync = exports.updatePlayerItemSync = exports.insertPlayerItemsSync = exports.getPlayerItemsSync = exports.getPlayerItemSync = void 0;
+exports.givePlayerItemSync = exports.setPlayerItemSync = exports.updatePlayerItemSync = exports.insertPlayerItemsSync = exports.getPlayerItemsSync = exports.getPlayerItemSync = void 0;
 const db_1 = require("../db");
 /**
  * Gets the amount of a singular item that a player owns.
@@ -84,6 +84,24 @@ function updatePlayerItemSync(playerId, itemId, amount) {
     `).run(amount, playerId, Number(itemId));
 }
 exports.updatePlayerItemSync = updatePlayerItemSync;
+/**
+ * Sets a player's item to an exact amount, inserting the row first if the player does not yet
+ * own the item. updatePlayerItemSync alone is a bare UPDATE that silently affects zero rows when
+ * the row is missing, so admin "add item" of a not-yet-owned item would return success but write nothing.
+ *
+ * @param playerId The ID of the player.
+ * @param itemId The item's ID.
+ * @param amount The exact amount the item should have.
+ */
+function setPlayerItemSync(playerId, itemId, amount) {
+    if (getPlayerItemSync(playerId, itemId) === null) {
+        insertPlayerItemSync(playerId, itemId, amount);
+    }
+    else {
+        updatePlayerItemSync(playerId, itemId, amount);
+    }
+}
+exports.setPlayerItemSync = setPlayerItemSync;
 /**
  * Gives a player giveAmount of an item.
  *

@@ -13,13 +13,15 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const wdfpData_1 = require("../../data/wdfpData");
+const character_1 = require("../../data/domains/character");
+const item_1 = require("../../data/domains/item");
+const session_1 = require("../../data/domains/session");
 const assets_1 = require("../../lib/assets");
 const utils_1 = require("../../utils");
 const crypto_1 = require("crypto");
 const utils_2 = require("../../data/utils");
 const activeAccount_1 = require("../../data/activeAccount");
-const character_1 = require("./character");
+const character_2 = require("./character");
 const ex_ability_json_1 = __importDefault(require("../../../assets/ex_ability.json"));
 // ---- A/B group classification from orderedmap ability names ----
 const A_PREFIXES = ['atk_self_', 'skilldamage_self_', 'directdamage_self_',
@@ -130,7 +132,7 @@ const drawExpBoost = (request, reply, autoAccept) => __awaiter(void 0, void 0, v
         return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid request body."
         });
-    const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+    const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
     if (!viewerIdSession)
         return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid viewer id."
@@ -140,7 +142,7 @@ const drawExpBoost = (request, reply, autoAccept) => __awaiter(void 0, void 0, v
         return reply.status(500).send({
             "error": "Internal Server Error", "message": "No players bound to account."
         });
-    const characterData = (0, wdfpData_1.getPlayerCharacterSync)(playerId, characterId);
+    const characterData = (0, character_1.getPlayerCharacterSync)(playerId, characterId);
     if (characterData === null)
         return reply.status(400).send({
             "error": "Bad Request", "message": "Player does not own character."
@@ -159,7 +161,7 @@ const drawExpBoost = (request, reply, autoAccept) => __awaiter(void 0, void 0, v
         return reply.status(400).send({
             "error": "Bad Request", "message": "Attempt to use wrong item with different element from character."
         });
-    const costItemAmount = (0, wdfpData_1.getPlayerItemSync)(playerId, costItemId);
+    const costItemAmount = (0, item_1.getPlayerItemSync)(playerId, costItemId);
     if (costItemAmount === null)
         return reply.status(400).send({
             "error": "Bad Request", "message": "You do not own item."
@@ -171,7 +173,7 @@ const drawExpBoost = (request, reply, autoAccept) => __awaiter(void 0, void 0, v
         });
     // ensure max over limit step (aligned with client isMaxOverLimitStep)
     const rarity = characterAssetData.rarity;
-    const maxOver = character_1.characterMaxOverLimits[rarity];
+    const maxOver = character_2.characterMaxOverLimits[rarity];
     if (maxOver === undefined || characterData.overLimitStep < maxOver)
         return reply.status(400).send({
             "error": "Bad Request", "message": "Character not at max over limit step."
@@ -183,7 +185,7 @@ const drawExpBoost = (request, reply, autoAccept) => __awaiter(void 0, void 0, v
             "error": "Internal Server Error", "message": "Status pool not found."
         });
     // deduct
-    (0, wdfpData_1.updatePlayerItemSync)(playerId, costItemId, afterCostItemAmount);
+    (0, item_1.updatePlayerItemSync)(playerId, costItemId, afterCostItemAmount);
     const draw = drawExBoostAbilities(costItemId, exStatusPool);
     const drawResult = {
         characterId, statusId: draw.statusId, abilityIdList: draw.abilityIdList
@@ -191,7 +193,7 @@ const drawExpBoost = (request, reply, autoAccept) => __awaiter(void 0, void 0, v
     const headers = (0, utils_1.generateDataHeaders)({ viewer_id: viewerId });
     reply.header("content-type", "application/x-msgpack");
     if (autoAccept) {
-        (0, wdfpData_1.updatePlayerCharacterSync)(playerId, characterId, {
+        (0, character_1.updatePlayerCharacterSync)(playerId, characterId, {
             exBoost: { statusId: drawResult.statusId, abilityIdList: drawResult.abilityIdList }
         });
         return reply.status(200).send({
@@ -241,7 +243,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid viewer id."
@@ -262,12 +264,12 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             return reply.status(200).send({ data_headers: headers, data: { mail_arrived: false } });
         }
         const characterId = drawResult.characterId;
-        const characterData = (0, wdfpData_1.getPlayerCharacterSync)(playerId, characterId);
+        const characterData = (0, character_1.getPlayerCharacterSync)(playerId, characterId);
         if (characterData === null)
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Player does not own character."
             });
-        (0, wdfpData_1.updatePlayerCharacterSync)(playerId, characterId, {
+        (0, character_1.updatePlayerCharacterSync)(playerId, characterId, {
             exBoost: { statusId: drawResult.statusId, abilityIdList: drawResult.abilityIdList }
         });
         return reply.status(200).send({

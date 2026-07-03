@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateAccount = exports.updateAccountSync = exports.insertAccount = exports.getAccountPlayers = exports.getAccountPlayersSync = exports.deleteAccountSync = exports.getAllAccountsSync = exports.getAccount = exports.getAccountFromIdpIdSync = exports.getAccountSync = void 0;
+exports.updateAccount = exports.updateAccountSync = exports.insertAccount = exports.insertAccountSync = exports.getAccountPlayers = exports.getAccountPlayersSync = exports.deleteAccountSync = exports.getAllAccountsSync = exports.getAccount = exports.getAccountFromIdpIdSync = exports.getAccountSync = void 0;
 const db_1 = require("../db");
 // Account
 /**
@@ -151,6 +151,7 @@ function insertAccountSync(account) {
     finalAccount.regTime = dateNow;
     return finalAccount;
 }
+exports.insertAccountSync = insertAccountSync;
 /**
  * Inserts an Account into the database.
  *

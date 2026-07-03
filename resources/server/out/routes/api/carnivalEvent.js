@@ -9,7 +9,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const wdfpData_1 = require("../../data/wdfpData");
+const carnivalEvent_1 = require("../../data/domains/carnivalEvent");
+const party_1 = require("../../data/domains/party");
+const session_1 = require("../../data/domains/session");
 const activeAccount_1 = require("../../data/activeAccount");
 const player_1 = require("../../data/domains/player");
 const utils_1 = require("../../data/utils");
@@ -17,11 +19,11 @@ const utils_2 = require("../../utils");
 const types_1 = require("../../data/types");
 function buildCarnivalPartyGroupList(playerId) {
     // 1. Try to get saved EVENT party groups
-    let groups = (0, wdfpData_1.getPlayerPartyGroupListSync)(playerId, types_1.PartyCategory.EVENT);
+    let groups = (0, party_1.getPlayerPartyGroupListSync)(playerId, types_1.PartyCategory.EVENT);
     // 2. First time - create empty EVENT defaults (independent from NORMAL pool)
     if (Object.keys(groups).length === 0) {
         groups = (0, player_1.getDefaultPlayerPartyGroupsSync)(types_1.PartyCategory.EVENT);
-        (0, wdfpData_1.insertPlayerPartyGroupListSync)(playerId, groups);
+        (0, party_1.insertPlayerPartyGroupListSync)(playerId, groups);
     }
     const serialized = (0, utils_1.serializePartyGroupList)(groups);
     // Convert to array format the client expects
@@ -59,7 +61,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Bad Request",
                 "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -74,7 +76,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         const partyGroups = buildCarnivalPartyGroupList(playerId);
         // Build records from DB
         const eventId = body.event_id;
-        const dbRecords = (0, wdfpData_1.getPlayerCarnivalEventRecordsSync)(playerId, eventId);
+        const dbRecords = (0, carnivalEvent_1.getPlayerCarnivalEventRecordsSync)(playerId, eventId);
         const records = dbRecords.map(r => {
             var _a, _b;
             return ({
@@ -103,7 +105,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Bad Request",
                 "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request",

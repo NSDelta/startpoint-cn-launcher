@@ -9,6 +9,9 @@ const types_1 = require("../types");
 const utils_1 = require("../../utils");
 const utils_2 = require("../utils");
 const account_1 = require("./account");
+const quest_1 = require("./quest");
+const time_utils_1 = require("../../lib/time-utils");
+const snapshot_1 = require("../../lib/mission/snapshot");
 const daily_challenge_point_lookup_json_1 = __importDefault(require("../../../assets/daily_challenge_point_lookup.json"));
 function getDailyChallengePointDefaults() {
     const lookup = daily_challenge_point_lookup_json_1.default;
@@ -29,7 +32,7 @@ const item_1 = require("./item");
 const equipment_1 = require("./equipment");
 const party_1 = require("./party");
 const character_1 = require("./character");
-const quest_1 = require("./quest");
+const quest_2 = require("./quest");
 const gacha_1 = require("./gacha");
 const boxGacha_1 = require("./boxGacha");
 const rushEvent_1 = require("./rushEvent");
@@ -270,6 +273,12 @@ function buildPlayer(raw) {
         freeMana: raw.free_mana,
         paidMana: raw.paid_mana,
         enableAuto3x: (0, utils_2.deserializeBoolean)(raw.enable_auto_3x),
+        totalStaminaUsed: raw.total_stamina_used || 0,
+        totalPowerflips: raw.total_powerflips || 0,
+        totalDashes: raw.total_dashes || 0,
+        totalManaObtained: raw.total_mana_obtained || 0,
+        maxComboAchieved: raw.max_combo_achieved || 0,
+        totalLoginDays: raw.total_login_days || 0,
         tutorialStep: raw.tutorial_step,
         tutorialSkipFlag: raw.tutorial_skip_flag === null ? null : (0, utils_2.deserializeBoolean)(raw.tutorial_skip_flag),
         tutorialGachaCharacterId: raw.tutorial_gacha_character_id,
@@ -281,7 +290,7 @@ function getPlayerSync(playerId) {
         transition_state, role, name, last_login_time, comment,
         vmoney, free_vmoney, rank_point, star_crumb,
         bond_token, exp_pool, exp_pooled_time, leader_character_id, party_slot,
-        degree_id, birth, free_mana, paid_mana, enable_auto_3x, tutorial_step, tutorial_skip_flag, tutorial_gacha_character_id
+        degree_id, birth, free_mana, paid_mana, enable_auto_3x, total_stamina_used, total_powerflips, total_dashes, total_mana_obtained, max_combo_achieved, total_login_days, tutorial_step, tutorial_skip_flag, tutorial_gacha_character_id
     FROM players
     WHERE id = ?    
     `).get(playerId);
@@ -296,7 +305,7 @@ function getAllPlayersSync(offset = 0, limit = 25) {
         transition_state, role, name, last_login_time, comment,
         vmoney, free_vmoney, rank_point, star_crumb,
         bond_token, exp_pool, exp_pooled_time, leader_character_id, party_slot,
-        degree_id, birth, free_mana, paid_mana, enable_auto_3x, tutorial_step, tutorial_skip_flag, tutorial_gacha_character_id
+        degree_id, birth, free_mana, paid_mana, enable_auto_3x, total_stamina_used, total_powerflips, total_dashes, total_mana_obtained, max_combo_achieved, total_login_days, tutorial_step, tutorial_skip_flag, tutorial_gacha_character_id
     FROM players
     LIMIT ?
     OFFSET ?
@@ -312,47 +321,66 @@ exports.getAllPlayersSync = getAllPlayersSync;
  * @returns The ID of the player that was inserted.
  */
 function insertPlayerSync(accountId, player) {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j;
     const playerId = player.id;
     const playerIdGiven = playerId !== undefined;
-    const values = [
-        player.stamina,
-        player.staminaHealTime.toISOString(),
-        player.boostPoint,
-        player.bossBoostPoint,
-        player.transitionState,
-        player.role,
-        player.name,
-        player.lastLoginTime.toISOString(),
-        player.comment,
-        player.vmoney,
-        player.freeVmoney,
-        player.rankPoint,
-        player.starCrumb,
-        player.bondToken,
-        player.expPool,
-        player.expPooledTime.toISOString(),
-        player.leaderCharacterId,
-        player.partySlot,
-        player.degreeId,
-        player.birth,
-        player.freeMana,
-        player.paidMana,
-        (0, utils_2.serializeBoolean)(player.enableAuto3x),
-        accountId,
-        player.tutorialStep === null ? null : player.tutorialStep,
-        player.tutorialSkipFlag === null ? null : (0, utils_2.serializeBoolean)(player.tutorialSkipFlag),
-        player.tutorialGachaCharacterId === undefined ? null : player.tutorialGachaCharacterId
-    ];
+    const params = {
+        stamina: player.stamina,
+        stamina_heal_time: player.staminaHealTime.toISOString(),
+        boost_point: player.boostPoint,
+        boss_boost_point: player.bossBoostPoint,
+        transition_state: player.transitionState,
+        role: player.role,
+        name: player.name,
+        last_login_time: player.lastLoginTime.toISOString(),
+        comment: player.comment,
+        vmoney: player.vmoney,
+        free_vmoney: player.freeVmoney,
+        rank_point: player.rankPoint,
+        star_crumb: player.starCrumb,
+        bond_token: player.bondToken,
+        exp_pool: player.expPool,
+        exp_pooled_time: player.expPooledTime.toISOString(),
+        leader_character_id: player.leaderCharacterId,
+        party_slot: player.partySlot,
+        degree_id: player.degreeId,
+        birth: player.birth,
+        free_mana: player.freeMana,
+        paid_mana: player.paidMana,
+        enable_auto_3x: (0, utils_2.serializeBoolean)(player.enableAuto3x),
+        total_stamina_used: (_a = player.totalStaminaUsed) !== null && _a !== void 0 ? _a : 0,
+        total_powerflips: (_b = player.totalPowerflips) !== null && _b !== void 0 ? _b : 0,
+        total_dashes: (_c = player.totalDashes) !== null && _c !== void 0 ? _c : 0,
+        total_mana_obtained: (_d = player.totalManaObtained) !== null && _d !== void 0 ? _d : 0,
+        max_combo_achieved: (_e = player.maxComboAchieved) !== null && _e !== void 0 ? _e : 0,
+        total_login_days: (_f = player.totalLoginDays) !== null && _f !== void 0 ? _f : 0,
+        account_id: accountId,
+        tutorial_step: (_g = player.tutorialStep) !== null && _g !== void 0 ? _g : null,
+        tutorial_skip_flag: player.tutorialSkipFlag !== null ? (0, utils_2.serializeBoolean)(player.tutorialSkipFlag) : null,
+        tutorial_gacha_character_id: (_h = player.tutorialGachaCharacterId) !== null && _h !== void 0 ? _h : null,
+        time_offset: (_j = player.timeOffset) !== null && _j !== void 0 ? _j : null,
+    };
     if (playerIdGiven)
-        values.push(playerId);
+        params.id = playerId;
+    const idCol = playerIdGiven ? ', id' : '';
+    const idVal = playerIdGiven ? ', @id' : '';
     const insert = (0, db_1.getDb)().prepare(`
     INSERT INTO players (stamina, stamina_heal_time, boost_point, boss_boost_point,
         transition_state, role, name, last_login_time, comment, vmoney, free_vmoney,
         rank_point, star_crumb, bond_token, exp_pool, exp_pooled_time, leader_character_id,
-        party_slot, degree_id, birth, free_mana, paid_mana, enable_auto_3x, account_id, 
-        tutorial_step, tutorial_skip_flag, tutorial_gacha_character_id${playerIdGiven ? ', id' : ''})
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${playerIdGiven ? ', ?' : ''})
-    `).run(values);
+        party_slot, degree_id, birth, free_mana, paid_mana, enable_auto_3x,
+        total_stamina_used, total_powerflips, total_dashes, total_mana_obtained, max_combo_achieved, total_login_days, account_id,
+        tutorial_step, tutorial_skip_flag, tutorial_gacha_character_id,
+        time_offset${idCol})
+    VALUES (@stamina, @stamina_heal_time, @boost_point, @boss_boost_point,
+        @transition_state, @role, @name, @last_login_time, @comment,
+        @vmoney, @free_vmoney, @rank_point, @star_crumb, @bond_token,
+        @exp_pool, @exp_pooled_time, @leader_character_id, @party_slot,
+        @degree_id, @birth, @free_mana, @paid_mana, @enable_auto_3x,
+        @total_stamina_used, @total_powerflips, @total_dashes, @total_mana_obtained, @max_combo_achieved, @total_login_days, @account_id,
+        @tutorial_step, @tutorial_skip_flag, @tutorial_gacha_character_id,
+        @time_offset${idVal})
+    `).run(params);
     // return
     return Number(insert.lastInsertRowid);
 }
@@ -375,10 +403,10 @@ function insertMergedPlayerDataSync(accountId, toInsert) {
     (0, party_1.insertPlayerPartyGroupListSync)(playerId, toInsert.partyGroupList);
     (0, item_1.insertPlayerItemsSync)(playerId, toInsert.itemList);
     (0, equipment_1.insertPlayerEquipmentListSync)(playerId, toInsert.equipmentList);
-    (0, quest_1.insertPlayerQuestProgressListSync)(playerId, toInsert.questProgress);
+    (0, quest_2.insertPlayerQuestProgressListSync)(playerId, toInsert.questProgress);
     (0, gacha_1.insertPlayerGachaInfoListSync)(playerId, toInsert.gachaInfoList);
     (0, gacha_1.insertPlayerGachaCampaignListSync)(playerId, toInsert.gachaCampaignList);
-    (0, quest_1.insertPlayerDrawnQuestsSync)(playerId, toInsert.drawnQuestList);
+    (0, quest_2.insertPlayerDrawnQuestsSync)(playerId, toInsert.drawnQuestList);
     (0, campaign_1.insertPlayerPeriodicRewardPointsListSync)(playerId, toInsert.periodicRewardPointList);
     (0, mission_1.insertPlayerActiveMissionsSync)(playerId, toInsert.allActiveMissionList);
     (0, boxGacha_1.insertPlayerBoxGachasSync)(playerId, toInsert.boxGachaList);
@@ -442,456 +470,461 @@ exports.getDefaultPlayerPartyGroupsSync = getDefaultPlayerPartyGroupsSync;
  */
 function insertDefaultPlayerSync(accountId) {
     const player = (0, utils_2.getDefaultPlayerData)();
-    const playerId = insertPlayerSync(accountId, player);
-    // daily challenge point list — initialize all 282 CDN entries
-    insertPlayerDailyChallengePointListSync(playerId, getDailyChallengePointDefaults());
-    // insert triggered tutorials — empty to trigger tutorial on new accounts
-    (0, tutorial_1.insertPlayerTriggeredTutorialsSync)(playerId, []);
-    // insert cleared regular missions
-    (0, mission_1.insertPlayerClearedRegularMissionListSync)(playerId, {});
-    // insert characterList
-    (0, character_1.insertPlayerCharactersSync)(playerId, {
-        "1": {
-            entryCount: 1,
-            evolutionLevel: 0,
-            overLimitStep: 0,
-            protection: false,
-            joinTime: new Date(),
-            updateTime: new Date(),
-            exp: 10,
-            stack: 0,
-            bondTokenList: [
+    const db = (0, db_1.getDb)();
+    const insertAll = db.transaction(() => {
+        const playerId = insertPlayerSync(accountId, player);
+        // daily challenge point list — initialize all 282 CDN entries
+        insertPlayerDailyChallengePointListSync(playerId, getDailyChallengePointDefaults());
+        // insert triggered tutorials — empty to trigger tutorial on new accounts
+        (0, tutorial_1.insertPlayerTriggeredTutorialsSync)(playerId, []);
+        // insert cleared regular missions
+        (0, mission_1.insertPlayerClearedRegularMissionListSync)(playerId, {});
+        // insert characterList
+        (0, character_1.insertPlayerCharactersSync)(playerId, {
+            "1": {
+                entryCount: 1,
+                evolutionLevel: 0,
+                overLimitStep: 0,
+                protection: false,
+                joinTime: new Date(),
+                updateTime: new Date(),
+                exp: 10,
+                stack: 0,
+                bondTokenList: [
+                    {
+                        manaBoardIndex: 1,
+                        status: 0
+                    },
+                    {
+                        manaBoardIndex: 2,
+                        status: 0
+                    }
+                ],
+                manaBoardIndex: 1
+            }
+        });
+        // insert characterManaNodeList
+        (0, character_1.insertPlayerCharactersManaNodesSync)(playerId, {});
+        // insert default parties
+        (0, party_1.insertPlayerPartyGroupListSync)(playerId, getDefaultPlayerPartyGroupsSync());
+        // insert items
+        (0, item_1.insertPlayerItemsSync)(playerId, {});
+        // insert equipment
+        (0, equipment_1.insertPlayerEquipmentListSync)(playerId, {});
+        // insert quest progress
+        (0, quest_2.insertPlayerQuestProgressListSync)(playerId, {});
+        // insert options
+        (0, option_1.insertPlayerOptionsSync)(playerId, {
+            "gacha_play_no_rarity_up_movie": false,
+            "auto_play": false,
+            "number_notation_symbol": true,
+            "payment_alert": true,
+            "room_number_hidden": false,
+            "attention_sound_effect": true,
+            "attention_vibration": false,
+            "attention_enable_in_battle": true,
+            "simple_ability_description": false
+        });
+        // insert gacha info
+        (0, gacha_1.insertPlayerGachaInfoListSync)(playerId, []);
+        // insert drawnQuestList
+        (0, quest_2.insertPlayerDrawnQuestsSync)(playerId, [
+            {
+                categoryId: 6,
+                questId: 5001,
+                oddsId: 5
+            },
+            {
+                categoryId: 6,
+                questId: 5002,
+                oddsId: 3
+            },
+            {
+                categoryId: 6,
+                questId: 5003,
+                oddsId: 1
+            },
+            {
+                categoryId: 6,
+                questId: 5004,
+                oddsId: 6
+            },
+            {
+                categoryId: 6,
+                questId: 5005,
+                oddsId: 2
+            },
+            {
+                categoryId: 6,
+                questId: 13001,
+                oddsId: 2
+            },
+            {
+                categoryId: 6,
+                questId: 13002,
+                oddsId: 4
+            },
+            {
+                categoryId: 6,
+                questId: 13003,
+                oddsId: 3
+            },
+            {
+                categoryId: 6,
+                questId: 13004,
+                oddsId: 2
+            },
+            {
+                categoryId: 6,
+                questId: 13005,
+                oddsId: 9
+            },
+            {
+                categoryId: 6,
+                questId: 13006,
+                oddsId: 2
+            },
+            {
+                categoryId: 6,
+                questId: 14001,
+                oddsId: 4
+            },
+            {
+                categoryId: 6,
+                questId: 14002,
+                oddsId: 3
+            },
+            {
+                categoryId: 6,
+                questId: 14003,
+                oddsId: 6
+            },
+            {
+                categoryId: 6,
+                questId: 14004,
+                oddsId: 5
+            },
+            {
+                categoryId: 6,
+                questId: 14005,
+                oddsId: 8
+            },
+            {
+                categoryId: 6,
+                questId: 14006,
+                oddsId: 6
+            },
+            {
+                categoryId: 6,
+                questId: 15001,
+                oddsId: 6
+            },
+            {
+                categoryId: 6,
+                questId: 15002,
+                oddsId: 3
+            },
+            {
+                categoryId: 6,
+                questId: 15003,
+                oddsId: 5
+            },
+            {
+                categoryId: 6,
+                questId: 15004,
+                oddsId: 4
+            },
+            {
+                categoryId: 6,
+                questId: 15005,
+                oddsId: 7
+            },
+            {
+                categoryId: 6,
+                oddsId: 5,
+                questId: 15006
+            },
+            {
+                categoryId: 6,
+                questId: 16001,
+                oddsId: 1
+            },
+            {
+                categoryId: 6,
+                questId: 16002,
+                oddsId: 8
+            },
+            {
+                categoryId: 6,
+                questId: 16003,
+                oddsId: 3
+            },
+            {
+                categoryId: 6,
+                questId: 16004,
+                oddsId: 6
+            },
+            {
+                categoryId: 6,
+                questId: 16005,
+                oddsId: 1
+            },
+            {
+                categoryId: 6,
+                questId: 16006,
+                oddsId: 9
+            },
+            {
+                categoryId: 6,
+                questId: 17001,
+                oddsId: 6
+            },
+            {
+                categoryId: 6,
+                questId: 17002,
+                oddsId: 8
+            },
+            {
+                categoryId: 6,
+                questId: 17003,
+                oddsId: 2
+            },
+            {
+                categoryId: 6,
+                questId: 17004,
+                oddsId: 3
+            },
+            {
+                categoryId: 6,
+                questId: 17005,
+                oddsId: 7
+            },
+            {
+                categoryId: 6,
+                questId: 17006,
+                oddsId: 6
+            },
+            {
+                categoryId: 6,
+                questId: 18001,
+                oddsId: 8
+            },
+            {
+                categoryId: 6,
+                questId: 18002,
+                oddsId: 3
+            },
+            {
+                categoryId: 6,
+                questId: 18003,
+                oddsId: 4
+            },
+            {
+                categoryId: 6,
+                questId: 18004,
+                oddsId: 3
+            },
+            {
+                categoryId: 6,
+                questId: 18005,
+                oddsId: 4
+            },
+            {
+                categoryId: 6,
+                questId: 18006,
+                oddsId: 6
+            },
+            {
+                categoryId: 6,
+                questId: 19001,
+                oddsId: 6
+            },
+            {
+                categoryId: 6,
+                questId: 19002,
+                oddsId: 7
+            },
+            {
+                categoryId: 6,
+                questId: 19003,
+                oddsId: 3
+            },
+            {
+                categoryId: 6,
+                questId: 19004,
+                oddsId: 3
+            },
+            {
+                categoryId: 6,
+                questId: 19005,
+                oddsId: 2
+            },
+            {
+                categoryId: 6,
+                questId: 19006,
+                oddsId: 1
+            },
+            {
+                categoryId: 6,
+                questId: 19007,
+                oddsId: 7
+            },
+            {
+                categoryId: 6,
+                questId: 19008,
+                oddsId: 7
+            },
+            {
+                categoryId: 6,
+                questId: 19009,
+                oddsId: 5
+            },
+            {
+                categoryId: 6,
+                questId: 19010,
+                oddsId: 2
+            },
+            {
+                categoryId: 6,
+                questId: 19011,
+                oddsId: 2
+            },
+            {
+                categoryId: 6,
+                questId: 19012,
+                oddsId: 9
+            },
+            {
+                categoryId: 6,
+                questId: 19013,
+                oddsId: 4
+            },
+            {
+                categoryId: 6,
+                questId: 19014,
+                oddsId: 8
+            },
+            {
+                categoryId: 6,
+                questId: 19015,
+                oddsId: 1
+            },
+            {
+                categoryId: 6,
+                questId: 19016,
+                oddsId: 1
+            },
+            {
+                categoryId: 6,
+                questId: 19017,
+                oddsId: 6
+            },
+            {
+                categoryId: 6,
+                questId: 19018,
+                oddsId: 4
+            },
+            {
+                categoryId: 14,
+                questId: 1001,
+                oddsId: 21
+            },
+            {
+                categoryId: 14,
+                questId: 1002,
+                oddsId: 30
+            },
+            {
+                categoryId: 14,
+                questId: 1003,
+                oddsId: 20
+            },
+            {
+                categoryId: 14,
+                questId: 1004,
+                oddsId: 27
+            },
+            {
+                categoryId: 14,
+                questId: 1005,
+                oddsId: 9
+            },
+            {
+                categoryId: 14,
+                questId: 1006,
+                oddsId: 35
+            },
+        ]);
+        // insert periodicReward
+        (0, campaign_1.insertPlayerPeriodicRewardPointsListSync)(playerId, [
+            {
+                id: 1,
+                point: 22,
+            },
+            {
+                id: 2,
+                point: 2,
+            },
+            {
+                id: 3,
+                point: 2,
+            },
+            {
+                id: 10000000,
+                point: 2,
+            },
+        ]);
+        // insert active missions
+        (0, mission_1.insertPlayerActiveMissionsSync)(playerId, {});
+        // insert box gacha
+        (0, boxGacha_1.insertPlayerBoxGachasSync)(playerId, {
+            "1001": [
                 {
-                    manaBoardIndex: 1,
-                    status: 0
+                    boxId: 1,
+                    resetTimes: 0,
+                    remainingNumber: 572,
+                    isClosed: false
                 },
                 {
-                    manaBoardIndex: 2,
-                    status: 0
-                }
-            ],
-            manaBoardIndex: 1
-        }
+                    boxId: 2,
+                    resetTimes: 0,
+                    remainingNumber: 647,
+                    isClosed: false
+                },
+                {
+                    boxId: 3,
+                    resetTimes: 0,
+                    remainingNumber: 732,
+                    isClosed: false
+                },
+                {
+                    boxId: 4,
+                    resetTimes: 0,
+                    remainingNumber: 912,
+                    isClosed: false
+                },
+                {
+                    boxId: 5,
+                    resetTimes: 0,
+                    remainingNumber: 1401,
+                    isClosed: false
+                },
+            ]
+        });
+        // insert start dash campaign list
+        (0, campaign_1.insertPlayerStartDashExchangeCampaignsSync)(playerId, []);
+        // insert the multi special exchange campaign list
+        (0, campaign_1.insertPlayerMultiSpecialExchangeCampaignsSync)(playerId, [
+            {
+                campaignId: 3,
+                status: 1
+            }
+        ]);
+        return playerId;
     });
-    // insert characterManaNodeList
-    (0, character_1.insertPlayerCharactersManaNodesSync)(playerId, {});
-    // insert default parties
-    (0, party_1.insertPlayerPartyGroupListSync)(playerId, getDefaultPlayerPartyGroupsSync());
-    // insert items
-    (0, item_1.insertPlayerItemsSync)(playerId, {});
-    // insert equipment
-    (0, equipment_1.insertPlayerEquipmentListSync)(playerId, {});
-    // insert quest progress
-    (0, quest_1.insertPlayerQuestProgressListSync)(playerId, {});
-    // insert options
-    (0, option_1.insertPlayerOptionsSync)(playerId, {
-        "gacha_play_no_rarity_up_movie": false,
-        "auto_play": false,
-        "number_notation_symbol": true,
-        "payment_alert": true,
-        "room_number_hidden": false,
-        "attention_sound_effect": true,
-        "attention_vibration": false,
-        "attention_enable_in_battle": true,
-        "simple_ability_description": false
-    });
-    // insert gacha info
-    (0, gacha_1.insertPlayerGachaInfoListSync)(playerId, []);
-    // insert drawnQuestList
-    (0, quest_1.insertPlayerDrawnQuestsSync)(playerId, [
-        {
-            categoryId: 6,
-            questId: 5001,
-            oddsId: 5
-        },
-        {
-            categoryId: 6,
-            questId: 5002,
-            oddsId: 3
-        },
-        {
-            categoryId: 6,
-            questId: 5003,
-            oddsId: 1
-        },
-        {
-            categoryId: 6,
-            questId: 5004,
-            oddsId: 6
-        },
-        {
-            categoryId: 6,
-            questId: 5005,
-            oddsId: 2
-        },
-        {
-            categoryId: 6,
-            questId: 13001,
-            oddsId: 2
-        },
-        {
-            categoryId: 6,
-            questId: 13002,
-            oddsId: 4
-        },
-        {
-            categoryId: 6,
-            questId: 13003,
-            oddsId: 3
-        },
-        {
-            categoryId: 6,
-            questId: 13004,
-            oddsId: 2
-        },
-        {
-            categoryId: 6,
-            questId: 13005,
-            oddsId: 9
-        },
-        {
-            categoryId: 6,
-            questId: 13006,
-            oddsId: 2
-        },
-        {
-            categoryId: 6,
-            questId: 14001,
-            oddsId: 4
-        },
-        {
-            categoryId: 6,
-            questId: 14002,
-            oddsId: 3
-        },
-        {
-            categoryId: 6,
-            questId: 14003,
-            oddsId: 6
-        },
-        {
-            categoryId: 6,
-            questId: 14004,
-            oddsId: 5
-        },
-        {
-            categoryId: 6,
-            questId: 14005,
-            oddsId: 8
-        },
-        {
-            categoryId: 6,
-            questId: 14006,
-            oddsId: 6
-        },
-        {
-            categoryId: 6,
-            questId: 15001,
-            oddsId: 6
-        },
-        {
-            categoryId: 6,
-            questId: 15002,
-            oddsId: 3
-        },
-        {
-            categoryId: 6,
-            questId: 15003,
-            oddsId: 5
-        },
-        {
-            categoryId: 6,
-            questId: 15004,
-            oddsId: 4
-        },
-        {
-            categoryId: 6,
-            questId: 15005,
-            oddsId: 7
-        },
-        {
-            categoryId: 6,
-            oddsId: 5,
-            questId: 15006
-        },
-        {
-            categoryId: 6,
-            questId: 16001,
-            oddsId: 1
-        },
-        {
-            categoryId: 6,
-            questId: 16002,
-            oddsId: 8
-        },
-        {
-            categoryId: 6,
-            questId: 16003,
-            oddsId: 3
-        },
-        {
-            categoryId: 6,
-            questId: 16004,
-            oddsId: 6
-        },
-        {
-            categoryId: 6,
-            questId: 16005,
-            oddsId: 1
-        },
-        {
-            categoryId: 6,
-            questId: 16006,
-            oddsId: 9
-        },
-        {
-            categoryId: 6,
-            questId: 17001,
-            oddsId: 6
-        },
-        {
-            categoryId: 6,
-            questId: 17002,
-            oddsId: 8
-        },
-        {
-            categoryId: 6,
-            questId: 17003,
-            oddsId: 2
-        },
-        {
-            categoryId: 6,
-            questId: 17004,
-            oddsId: 3
-        },
-        {
-            categoryId: 6,
-            questId: 17005,
-            oddsId: 7
-        },
-        {
-            categoryId: 6,
-            questId: 17006,
-            oddsId: 6
-        },
-        {
-            categoryId: 6,
-            questId: 18001,
-            oddsId: 8
-        },
-        {
-            categoryId: 6,
-            questId: 18002,
-            oddsId: 3
-        },
-        {
-            categoryId: 6,
-            questId: 18003,
-            oddsId: 4
-        },
-        {
-            categoryId: 6,
-            questId: 18004,
-            oddsId: 3
-        },
-        {
-            categoryId: 6,
-            questId: 18005,
-            oddsId: 4
-        },
-        {
-            categoryId: 6,
-            questId: 18006,
-            oddsId: 6
-        },
-        {
-            categoryId: 6,
-            questId: 19001,
-            oddsId: 6
-        },
-        {
-            categoryId: 6,
-            questId: 19002,
-            oddsId: 7
-        },
-        {
-            categoryId: 6,
-            questId: 19003,
-            oddsId: 3
-        },
-        {
-            categoryId: 6,
-            questId: 19004,
-            oddsId: 3
-        },
-        {
-            categoryId: 6,
-            questId: 19005,
-            oddsId: 2
-        },
-        {
-            categoryId: 6,
-            questId: 19006,
-            oddsId: 1
-        },
-        {
-            categoryId: 6,
-            questId: 19007,
-            oddsId: 7
-        },
-        {
-            categoryId: 6,
-            questId: 19008,
-            oddsId: 7
-        },
-        {
-            categoryId: 6,
-            questId: 19009,
-            oddsId: 5
-        },
-        {
-            categoryId: 6,
-            questId: 19010,
-            oddsId: 2
-        },
-        {
-            categoryId: 6,
-            questId: 19011,
-            oddsId: 2
-        },
-        {
-            categoryId: 6,
-            questId: 19012,
-            oddsId: 9
-        },
-        {
-            categoryId: 6,
-            questId: 19013,
-            oddsId: 4
-        },
-        {
-            categoryId: 6,
-            questId: 19014,
-            oddsId: 8
-        },
-        {
-            categoryId: 6,
-            questId: 19015,
-            oddsId: 1
-        },
-        {
-            categoryId: 6,
-            questId: 19016,
-            oddsId: 1
-        },
-        {
-            categoryId: 6,
-            questId: 19017,
-            oddsId: 6
-        },
-        {
-            categoryId: 6,
-            questId: 19018,
-            oddsId: 4
-        },
-        {
-            categoryId: 14,
-            questId: 1001,
-            oddsId: 21
-        },
-        {
-            categoryId: 14,
-            questId: 1002,
-            oddsId: 30
-        },
-        {
-            categoryId: 14,
-            questId: 1003,
-            oddsId: 20
-        },
-        {
-            categoryId: 14,
-            questId: 1004,
-            oddsId: 27
-        },
-        {
-            categoryId: 14,
-            questId: 1005,
-            oddsId: 9
-        },
-        {
-            categoryId: 14,
-            questId: 1006,
-            oddsId: 35
-        },
-    ]);
-    // insert periodicReward
-    (0, campaign_1.insertPlayerPeriodicRewardPointsListSync)(playerId, [
-        {
-            id: 1,
-            point: 22,
-        },
-        {
-            id: 2,
-            point: 2,
-        },
-        {
-            id: 3,
-            point: 2,
-        },
-        {
-            id: 10000000,
-            point: 2,
-        },
-    ]);
-    // insert active missions
-    (0, mission_1.insertPlayerActiveMissionsSync)(playerId, {});
-    // insert box gacha
-    (0, boxGacha_1.insertPlayerBoxGachasSync)(playerId, {
-        "1001": [
-            {
-                boxId: 1,
-                resetTimes: 0,
-                remainingNumber: 572,
-                isClosed: false
-            },
-            {
-                boxId: 2,
-                resetTimes: 0,
-                remainingNumber: 647,
-                isClosed: false
-            },
-            {
-                boxId: 3,
-                resetTimes: 0,
-                remainingNumber: 732,
-                isClosed: false
-            },
-            {
-                boxId: 4,
-                resetTimes: 0,
-                remainingNumber: 912,
-                isClosed: false
-            },
-            {
-                boxId: 5,
-                resetTimes: 0,
-                remainingNumber: 1401,
-                isClosed: false
-            },
-        ]
-    });
-    // insert start dash campaign list
-    (0, campaign_1.insertPlayerStartDashExchangeCampaignsSync)(playerId, []);
-    // insert the multi special exchange campaign list
-    (0, campaign_1.insertPlayerMultiSpecialExchangeCampaignsSync)(playerId, [
-        {
-            campaignId: 3,
-            status: 1
-        }
-    ]);
+    const finalPlayerId = insertAll();
     const finalPlayer = player;
-    finalPlayer.id = playerId;
+    finalPlayer.id = finalPlayerId;
     return finalPlayer;
 }
 exports.insertDefaultPlayerSync = insertDefaultPlayerSync;
@@ -926,6 +959,12 @@ function updatePlayerSync(player) {
         'freeMana': 'free_mana',
         'paidMana': 'paid_mana',
         'enableAuto3x': 'enable_auto_3x',
+        'totalStaminaUsed': 'total_stamina_used',
+        'totalPowerflips': 'total_powerflips',
+        'totalDashes': 'total_dashes',
+        'totalManaObtained': 'total_mana_obtained',
+        'maxComboAchieved': 'max_combo_achieved',
+        'totalLoginDays': 'total_login_days',
         'tutorialStep': 'tutorial_step',
         'tutorialSkipFlag': 'tutorial_skip_flag',
         'tutorialGachaCharacterId': 'tutorial_gacha_character_id'
@@ -1022,16 +1061,18 @@ exports.collectPlayerPooledExpSync = collectPlayerPooledExpSync;
  * @returns A boolean; whether the daily reset was performed
  */
 function dailyResetPlayerDataSync(player, loginDate = new Date()) {
-    var _a;
+    var _a, _b;
     const lastLoginTime = player.lastLoginTime;
     const playerId = player.id;
-    if ((loginDate.getUTCFullYear() > lastLoginTime.getUTCFullYear()) || (loginDate.getUTCMonth() > lastLoginTime.getUTCMonth()) || (loginDate.getUTCDate() > lastLoginTime.getUTCDate())) {
-        // TODO: daily reset logic.
+    const crossedDay = (0, time_utils_1.isNewDay)(loginDate, lastLoginTime);
+    const crossedWeek = (0, time_utils_1.isNewWeek)(loginDate, lastLoginTime);
+    if (crossedDay) {
         updatePlayerSync({
             id: playerId,
             lastLoginTime: loginDate,
             bossBoostPoint: 3,
-            boostPoint: 3
+            boostPoint: 3,
+            totalLoginDays: ((_a = player.totalLoginDays) !== null && _a !== void 0 ? _a : 0) + 1
         });
         // Reset daily challenge points — sync with CDN and rebuild if missing
         const dcEntries = getPlayerDailyChallengePointListSync(playerId);
@@ -1043,7 +1084,7 @@ function dailyResetPlayerDataSync(player, loginDate = new Date()) {
             // Reset existing entries to CDN max
             for (const entry of dcEntries) {
                 const cdn = daily_challenge_point_lookup_json_1.default[String(entry.id)];
-                const maxPoint = (_a = cdn === null || cdn === void 0 ? void 0 : cdn.maxPoint) !== null && _a !== void 0 ? _a : entry.point;
+                const maxPoint = (_b = cdn === null || cdn === void 0 ? void 0 : cdn.maxPoint) !== null && _b !== void 0 ? _b : entry.point;
                 updatePlayerDailyChallengePointSync(playerId, entry.id, maxPoint + entry.campaignList.reduce((s, c) => s + c.additionalPoint, 0));
             }
             // Add any new CDN entries not yet in player's list
@@ -1066,11 +1107,38 @@ function dailyResetPlayerDataSync(player, loginDate = new Date()) {
         for (const campaign of gachaCampaigns) {
             (0, gacha_1.updatePlayerGachaCampaignSync)(playerId, campaign.gachaId, campaign.campaignId, 1);
         }
-        // weekly reset
-        if (loginDate.getUTCDay() === 0) {
+        // Daily mission reset: take snapshot + wipe cache
+        const questProgress = (0, quest_1.getPlayerQuestProgressSync)(playerId);
+        let totalClears = 0, ss = 0, s = 0, a = 0, b = 0;
+        for (const [section, quests] of Object.entries(questProgress)) {
+            for (const qp of quests) {
+                if (qp.finished) {
+                    totalClears++;
+                    if (qp.clearRank === 6)
+                        ss++;
+                    else if (qp.clearRank === 5)
+                        s++;
+                    else if (qp.clearRank === 4)
+                        a++;
+                    else if (qp.clearRank === 3)
+                        b++;
+                }
+            }
         }
-        // monthly reset
-        if (loginDate.getUTCDate() === 1) {
+        (0, snapshot_1.takeSnapshot)(playerId, 'daily', {
+            questClears: totalClears,
+            staminaUsed: player.totalStaminaUsed,
+            rankSs: ss, rankS: s, rankA: a, rankB: b,
+        });
+        (0, db_1.getDb)().prepare(`DELETE FROM players_active_missions_stages WHERE player_id = ? AND mission_id IN (SELECT id FROM players_active_missions WHERE player_id = ? AND progress >= 0)`).run(playerId, playerId);
+        (0, db_1.getDb)().prepare(`DELETE FROM players_active_missions WHERE player_id = ?`).run(playerId);
+        // weekly reset
+        if (crossedWeek) {
+            (0, snapshot_1.takeSnapshot)(playerId, 'weekly', {
+                questClears: totalClears,
+                staminaUsed: player.totalStaminaUsed,
+                rankSs: ss, rankS: s, rankA: a, rankB: b,
+            });
         }
         return true;
     }

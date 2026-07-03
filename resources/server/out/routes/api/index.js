@@ -11,7 +11,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const types_1 = require("../../data/types");
 const utils_1 = require("../../data/utils");
-const wdfpData_1 = require("../../data/wdfpData");
+const player_1 = require("../../data/domains/player");
+const session_1 = require("../../data/domains/session");
 const activeAccount_1 = require("../../data/activeAccount");
 const utils_2 = require("../../utils");
 const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
@@ -24,13 +25,13 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Bad Request",
                 "message": "Invalid request body."
             });
-        const session = yield (0, wdfpData_1.getSession)(zat);
+        const session = yield (0, session_1.getSession)(zat);
         if (session === null || session.type !== types_1.SessionType.ZAT)
             return reply.status(400).send({
                 "error": "Bad Request",
                 "message": "Invalid zat provided."
             });
-        const viewerSession = yield (0, wdfpData_1.getSession)(String(viewerId));
+        const viewerSession = yield (0, session_1.getSession)(String(viewerId));
         if (viewerSession === null || viewerSession.type !== types_1.SessionType.VIEWER)
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -38,16 +39,16 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             });
         const accountId = session.accountId;
         const playerId = (0, activeAccount_1.resolvePlayerIdSync)(accountId);
-        const player = playerId !== null ? (0, wdfpData_1.getPlayerSync)(playerId) : null;
+        const player = playerId !== null ? (0, player_1.getPlayerSync)(playerId) : null;
         if (player === null)
             return reply.status(500).send({
                 "error": "Internal Server Error",
                 "message": "No players bound to account."
             });
         // get last login time
-        (0, wdfpData_1.dailyResetPlayerDataSync)(player);
+        (0, player_1.dailyResetPlayerDataSync)(player);
         // collect the player's pooled exp
-        (0, wdfpData_1.collectPlayerDataPooledExpSync)(player);
+        (0, player_1.collectPlayerDataPooledExpSync)(player);
         const clientData = (0, utils_1.getClientSerializedData)(playerId, { viewerId: viewerId });
         if (clientData === null)
             return reply.status(500).send({

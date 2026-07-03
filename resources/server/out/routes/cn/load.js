@@ -10,10 +10,14 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const utils_1 = require("../../utils");
-const wdfpData_1 = require("../../data/wdfpData");
+const player_1 = require("../../data/domains/player");
+const quest_active_1 = require("../../data/domains/quest_active");
+const session_1 = require("../../data/domains/session");
 const utils_2 = require("../../data/utils");
 const activeAccount_1 = require("../../data/activeAccount");
-const multiRoom_1 = require("../../data/multiRoom");
+const serializer_1 = require("../../multi/room/serializer");
+const manager_1 = require("../../multi/room/manager");
+const validate_1 = require("../../lib/validate");
 function wrapOptionFields(d, resVer) {
     var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p;
     var _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3;
@@ -42,7 +46,7 @@ function wrapOptionFields(d, resVer) {
         (_o = (_2 = d.user_option).server_push) !== null && _o !== void 0 ? _o : (_2.server_push = false);
         (_p = (_3 = d.user_option).stamina) !== null && _p !== void 0 ? _p : (_3.stamina = false);
     }
-    d.cn_crash_url = `http://${(0, multiRoom_1.getDisplayHost)()}:${process.env.CN_LISTEN_PORT || "8001"}/crash`;
+    d.cn_crash_url = `http://${(0, serializer_1.getDisplayHost)()}:${process.env.CN_LISTEN_PORT || "8001"}/crash`;
     d.survey_url = "";
     d.qq_group_url = "";
     d.bug_report_url = "";
@@ -65,7 +69,25 @@ function wrapOptionFields(d, resVer) {
     d.special_exchange_campaign_list = [];
     d.win_lottery_active_mission_list = [];
     d.stars_gacha_campaign_list = [];
-    d.favorite_party_group_list = [];
+    // Build favorite_party_group_list from user_party_group_list
+    // Required for HomeScene kind=1 (profile_favorite) to work without F1010
+    // fromPartyInfo expects party_name/party_edited (not name/edited like fromPartyInfoLite)
+    d.favorite_party_group_list = Object.entries(d.user_party_group_list || {}).map(([groupId, group]) => ({
+        party_group_id: Number(groupId),
+        party_group_color_id: group.color_id,
+        party_list: Object.entries(group.list || {}).map(([partyId, party]) => ({
+            party_id: Number(partyId),
+            party_name: party.name,
+            character_ids: party.character_ids,
+            unison_character_ids: party.unison_character_ids,
+            equipment_ids: party.equipment_ids,
+            ability_soul_ids: party.ability_soul_ids,
+            options: party.options,
+            party_edited: party.edited,
+            current_battle_power: party.current_battle_power,
+            before_battle_power: party.before_battle_power,
+        }))
+    }));
     d.ranking_event_reward = [];
     d.party_list = [];
     d.payment_rebate_info = { expired_time: 0, status: 0, start_time: 0 };
@@ -78,21 +100,25 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         var _a;
         try {
             const body = request.body;
-            const accountId = body.viewer_id || body.keychain || 1;
+            const viewerId = body.viewer_id || body.keychain || 1;
+            const session = yield (0, session_1.getSession)(String(viewerId));
+            const accountId = session ? session.accountId : (body.viewer_id || body.keychain || 1);
             const playerId = (0, activeAccount_1.resolvePlayerIdSync)(accountId);
             if (!playerId) {
                 return reply.status(400).send({ error: "Bad Request", message: "No player found" });
             }
-            const player = (0, wdfpData_1.getPlayerSync)(playerId);
+            const player = (0, player_1.getPlayerSync)(playerId);
             if (player === null) {
                 return reply.status(500).send({ error: "Internal Server Error", message: "No player data." });
             }
             const now = (0, utils_1.getServerDate)();
-            (0, wdfpData_1.dailyResetPlayerDataSync)(player, now);
-            (0, wdfpData_1.collectPlayerDataPooledExpSync)(player, now);
+            (0, player_1.dailyResetPlayerDataSync)(player, now);
+            (0, player_1.collectPlayerDataPooledExpSync)(player, now);
+            // Run save validators (permanent fixes: max_level, etc.)
+            (0, validate_1.runPermanentValidators)(playerId);
             // 若自定义时间与 lastLogin 不同步，强制对齐（防止客户端弹"日期变了"）
             if (now.toDateString() !== player.lastLoginTime.toDateString()) {
-                (0, wdfpData_1.updatePlayerSync)({ id: player.id, lastLoginTime: now });
+                (0, player_1.updatePlayerSync)({ id: player.id, lastLoginTime: now });
             }
             const clientData = (0, utils_2.getClientSerializedData)(playerId, { viewerId: accountId });
             if (clientData === null) {
@@ -102,16 +128,26 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             console.log(`[CN-LOAD] res_ver=${resVer || '(not sent)'} account=${accountId} player=${playerId} party_slot=${(_a = clientData === null || clientData === void 0 ? void 0 : clientData.user_info) === null || _a === void 0 ? void 0 : _a.party_slot}`);
             wrapOptionFields(clientData, resVer);
             // Inject unfinished quest lists for battle recovery
-            const activeQuest = (0, wdfpData_1.getPlayerActiveQuestSync)(playerId);
+            const activeQuest = (0, quest_active_1.getPlayerActiveQuestSync)(playerId);
             if (activeQuest) {
-                const entry = { play_id: activeQuest.playId, continue_count: activeQuest.continueCount };
-                if (activeQuest.isMulti) {
+                // Verify room still exists (survives server restart)
+                const roomExists = activeQuest.roomNumber ? (0, manager_1.getRoom)(activeQuest.roomNumber) : true;
+                if (!roomExists) {
+                    console.log(`[CN-LOAD] active quest room ${activeQuest.roomNumber} not found, clearing`);
+                    (0, quest_active_1.deletePlayerActiveQuestSync)(playerId);
                     clientData.unfinished_quest_list = [];
-                    clientData.unfinished_multi_quest_list = [entry];
+                    clientData.unfinished_multi_quest_list = [];
                 }
                 else {
-                    clientData.unfinished_quest_list = [entry];
-                    clientData.unfinished_multi_quest_list = [];
+                    const entry = { play_id: activeQuest.playId, continue_count: activeQuest.continueCount };
+                    if (activeQuest.isMulti) {
+                        clientData.unfinished_quest_list = [];
+                        clientData.unfinished_multi_quest_list = [entry];
+                    }
+                    else {
+                        clientData.unfinished_quest_list = [entry];
+                        clientData.unfinished_multi_quest_list = [];
+                    }
                 }
             }
             else {

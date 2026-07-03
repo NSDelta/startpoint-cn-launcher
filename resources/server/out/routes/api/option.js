@@ -9,7 +9,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const wdfpData_1 = require("../../data/wdfpData");
+const session_1 = require("../../data/domains/session");
+const option_1 = require("../../data/domains/option");
 const activeAccount_1 = require("../../data/activeAccount");
 const utils_1 = require("../../utils");
 const updateRoute = (request, reply) => __awaiter(void 0, void 0, void 0, function* () {
@@ -20,7 +21,7 @@ const updateRoute = (request, reply) => __awaiter(void 0, void 0, void 0, functi
             "error": "Bad Request",
             "message": "Invalid request body."
         });
-    const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+    const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
     if (!viewerIdSession)
         return reply.status(400).send({
             "error": "Bad Request",
@@ -35,7 +36,7 @@ const updateRoute = (request, reply) => __awaiter(void 0, void 0, void 0, functi
         });
     // update options
     const updatedOptions = body.option_params;
-    (0, wdfpData_1.updatePlayerOptionsSync)(playerId, updatedOptions);
+    (0, option_1.updatePlayerOptionsSync)(playerId, updatedOptions);
     reply.header("content-type", "application/x-msgpack");
     return reply.status(200).send({
         "data_headers": (0, utils_1.generateDataHeaders)({

@@ -15,7 +15,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.rushEventFolderMaxRounds = void 0;
 const types_1 = require("../../data/types");
-const wdfpData_1 = require("../../data/wdfpData");
+const rushEvent_1 = require("../../data/domains/rushEvent");
+const player_1 = require("../../data/domains/player");
+const party_1 = require("../../data/domains/party");
+const session_1 = require("../../data/domains/session");
 const assets_1 = require("../../lib/assets");
 const types_2 = require("../../lib/types");
 const utils_1 = require("../../utils");
@@ -48,7 +51,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Bad Request",
                 "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -62,13 +65,13 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "message": "No player bound to account."
             });
         // get rush event data
-        let rushEventData = (0, wdfpData_1.getPlayerRushEventSync)(playerId, eventId);
+        let rushEventData = (0, rushEvent_1.getPlayerRushEventSync)(playerId, eventId);
         if (rushEventData === null) {
-            rushEventData = (0, wdfpData_1.getDefaultPlayerRushEventSync)(eventId);
-            (0, wdfpData_1.insertPlayerRushEventSync)(playerId, rushEventData);
+            rushEventData = (0, rushEvent_1.getDefaultPlayerRushEventSync)(eventId);
+            (0, rushEvent_1.insertPlayerRushEventSync)(playerId, rushEventData);
         }
         // get cleared folder id list
-        const clearedFolderIdList = (0, wdfpData_1.getPlayerRushEventClearedFoldersSync)(playerId, eventId);
+        const clearedFolderIdList = (0, rushEvent_1.getPlayerRushEventClearedFoldersSync)(playerId, eventId);
         // get serialized parties
         const serializedPlayedParties = (0, rush_1.getSerializedPlayerRushEventPlayedPartiesSync)(playerId, eventId);
         console.log(`[RUSH] summary: folderParties=${Object.keys((_a = serializedPlayedParties.folderParties) !== null && _a !== void 0 ? _a : {}).length} endlessParties=${Object.keys((_b = serializedPlayedParties.endlessParties) !== null && _b !== void 0 ? _b : {}).length}`);
@@ -103,7 +106,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Bad Request",
                 "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -117,7 +120,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "message": "No player bound to account."
             });
         // get existing rush event data 
-        const rushEventData = (0, wdfpData_1.getPlayerRushEventSync)(playerId, eventId);
+        const rushEventData = (0, rushEvent_1.getPlayerRushEventSync)(playerId, eventId);
         if (rushEventData === null)
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -130,7 +133,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "message": "Already selected a folder for this rush event."
             });
         // update folder
-        (0, wdfpData_1.updatePlayerRushEventSync)(playerId, {
+        (0, rushEvent_1.updatePlayerRushEventSync)(playerId, {
             eventId: eventId,
             activeRushBattleFolderId: folderId
         });
@@ -157,7 +160,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Bad Request",
                 "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -173,7 +176,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         // get player endless rank
         const endlessRanking = (0, rush_1.getPlayerRushEventEndlessBattleRankingSync)(playerId, eventId);
         // get all rankings for page
-        const rankings = (0, wdfpData_1.getRushEventEndlessRankingListSync)(eventId, page);
+        const rankings = (0, rushEvent_1.getRushEventEndlessRankingListSync)(eventId, page);
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({
             "data_headers": (0, utils_1.generateDataHeaders)({
@@ -199,7 +202,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Bad Request",
                 "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -233,7 +236,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Bad Request",
                 "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -264,7 +267,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Bad Request",
                 "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -278,12 +281,12 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "message": "No player bound to account."
             });
         // get parties
-        let playerPartyGroups = (0, wdfpData_1.getPlayerPartyGroupListSync)(playerId, types_1.PartyCategory.EVENT);
+        let playerPartyGroups = (0, party_1.getPlayerPartyGroupListSync)(playerId, types_1.PartyCategory.EVENT);
         console.log(`[RUSH] party: EVENT groups=${Object.keys(playerPartyGroups).length}`);
         if (0 >= Object.keys(playerPartyGroups).length) {
             console.log(`[RUSH] party: creating default EVENT parties`);
-            playerPartyGroups = (0, wdfpData_1.getDefaultPlayerPartyGroupsSync)(types_1.PartyCategory.EVENT);
-            (0, wdfpData_1.insertPlayerPartyGroupListSync)(playerId, playerPartyGroups);
+            playerPartyGroups = (0, player_1.getDefaultPlayerPartyGroupsSync)(types_1.PartyCategory.EVENT);
+            (0, party_1.insertPlayerPartyGroupListSync)(playerId, playerPartyGroups);
         }
         // convert to proper format
         const userPartyGroupList = [];
@@ -332,7 +335,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Bad Request",
                 "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -392,7 +395,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Bad Request",
                 "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -408,28 +411,28 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         if (questType === ResetQuestType.FOLDER) {
             // if reset target was provided, we're not resetting the entire folder
             if (resetTargetId !== undefined) {
-                (0, wdfpData_1.deletePlayerRushEventPlayedPartiesUntilSync)(playerId, eventId, types_1.RushEventBattleType.FOLDER, resetTargetId);
+                (0, rushEvent_1.deletePlayerRushEventPlayedPartiesUntilSync)(playerId, eventId, types_1.RushEventBattleType.FOLDER, resetTargetId);
             }
             else {
                 // reset entire folder
                 // update the active folder value
-                (0, wdfpData_1.updatePlayerRushEventSync)(playerId, {
+                (0, rushEvent_1.updatePlayerRushEventSync)(playerId, {
                     eventId: eventId,
                     activeRushBattleFolderId: null
                 });
                 // delete played parties
-                (0, wdfpData_1.deletePlayerRushEventPlayedPartyListSync)(playerId, eventId, types_1.RushEventBattleType.FOLDER);
+                (0, rushEvent_1.deletePlayerRushEventPlayedPartyListSync)(playerId, eventId, types_1.RushEventBattleType.FOLDER);
             }
         }
         else if (resetTargetId !== undefined) {
             // endless battle resetting
             if (isResetAfterTargetRound) {
                 // "reset up until here"
-                (0, wdfpData_1.deletePlayerRushEventPlayedPartiesUntilSync)(playerId, eventId, types_1.RushEventBattleType.ENDLESS, resetTargetId);
+                (0, rushEvent_1.deletePlayerRushEventPlayedPartiesUntilSync)(playerId, eventId, types_1.RushEventBattleType.ENDLESS, resetTargetId);
             }
             else {
                 // "reset only here"
-                (0, wdfpData_1.deletePlayerRushEventPlayedPartySync)(playerId, eventId, resetTargetId, types_1.RushEventBattleType.ENDLESS);
+                (0, rushEvent_1.deletePlayerRushEventPlayedPartySync)(playerId, eventId, resetTargetId, types_1.RushEventBattleType.ENDLESS);
             }
         }
         reply.header("content-type", "application/x-msgpack");
@@ -451,7 +454,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid viewer id."
@@ -505,7 +508,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid viewer id."
@@ -515,7 +518,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             return reply.status(500).send({
                 "error": "Internal Server Error", "message": "No player bound to account."
             });
-        const rushEventData = (0, wdfpData_1.getPlayerRushEventSync)(playerId, eventId);
+        const rushEventData = (0, rushEvent_1.getPlayerRushEventSync)(playerId, eventId);
         const serializedPlayedParties = rushEventData !== null
             ? (0, rush_1.getSerializedPlayerRushEventPlayedPartiesSync)(playerId, eventId)
             : { endlessParties: null, folderParties: null };

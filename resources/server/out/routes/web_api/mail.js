@@ -12,7 +12,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const wdfpData_1 = require("../../data/wdfpData");
+const account_1 = require("../../data/domains/account");
+const mail_1 = require("../../data/domains/mail");
 const character_json_1 = __importDefault(require("../../../assets/character.json"));
 const item_ids_json_1 = __importDefault(require("../../../assets/item_ids.json"));
 const equipment_ids_json_1 = __importDefault(require("../../../assets/equipment_ids.json"));
@@ -69,14 +70,14 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         if (desc !== null && desc.length > 512) {
             return reply.redirect("/mail?error=" + encodeURIComponent("正文过长（最多 512 字符）"));
         }
-        const accounts = (0, wdfpData_1.getAllAccountsSync)();
+        const accounts = (0, account_1.getAllAccountsSync)();
         const now = new Date().toISOString().replace("T", " ").substring(0, 19);
         let sentCount = 0;
         for (const account of accounts) {
-            const playerIds = (0, wdfpData_1.getAccountPlayersSync)(account.id);
+            const playerIds = (0, account_1.getAccountPlayersSync)(account.id);
             for (const playerId of playerIds) {
                 try {
-                    (0, wdfpData_1.insertMailSync)(playerId, {
+                    (0, mail_1.insertMailSync)(playerId, {
                         reason_id: 0,
                         subject,
                         description: desc,

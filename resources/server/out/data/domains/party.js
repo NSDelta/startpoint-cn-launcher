@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updatePlayerPartyGroupSync = exports.updatePlayerPartySync = exports.insertPlayerPartyGroupListSync = exports.getPlayerPartyGroupListSync = void 0;
+exports.countAbilitySoulUsedInPartiesSync = exports.updatePlayerPartyGroupSync = exports.updatePlayerPartySync = exports.insertPlayerPartyGroupListSync = exports.getPlayerPartyGroupListSync = void 0;
 const db_1 = require("../db");
 const types_1 = require("../types");
 const utils_1 = require("../utils");
@@ -122,3 +122,18 @@ function updatePlayerPartyGroupSync(playerId, groupId, colorId, category = types
     `).run(colorId, groupId, playerId, category);
 }
 exports.updatePlayerPartyGroupSync = updatePlayerPartyGroupSync;
+/**
+ * Count how many parties currently have the given ability soul equipped.
+ * Used by /item/sell to prevent selling souls that are in use.
+ */
+function countAbilitySoulUsedInPartiesSync(playerId, abilitySoulId) {
+    var _a;
+    const db = (0, db_1.getDb)();
+    const row = db.prepare(`
+    SELECT COUNT(*) AS cnt FROM players_parties
+    WHERE player_id = ?
+    AND (ability_soul_1 = ? OR ability_soul_2 = ? OR ability_soul_3 = ?)
+    `).get(playerId, abilitySoulId, abilitySoulId, abilitySoulId);
+    return (_a = row === null || row === void 0 ? void 0 : row.cnt) !== null && _a !== void 0 ? _a : 0;
+}
+exports.countAbilitySoulUsedInPartiesSync = countAbilitySoulUsedInPartiesSync;

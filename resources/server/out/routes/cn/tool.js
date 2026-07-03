@@ -10,7 +10,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const utils_1 = require("../../utils");
-const wdfpData_1 = require("../../data/wdfpData");
+const session_1 = require("../../data/domains/session");
+const account_1 = require("../../data/domains/account");
+const player_1 = require("../../data/domains/player");
 const types_1 = require("../../data/types");
 const activeAccount_1 = require("../../data/activeAccount");
 function generateLoginToken() {
@@ -48,60 +50,62 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         const loginToken = generateLoginToken();
         let accountId;
         let newAccount = true;
+        let viewerId; // set when reusing existing session
         if (!deviceId) {
             return reply.status(400).send({ error: "Missing device_id" });
         }
         // Device binding: each device gets its own account
-        const binding = (0, wdfpData_1.getDeviceBindingSync)(deviceId);
-        console.log(`[signup] device_id=${deviceId} udid=${udid} binding=${binding ? "account#" + binding.account_id : "none"}`);
+        const binding = (0, session_1.getDeviceBindingSync)(deviceId);
         if (binding) {
             // Known device — verify account still exists
-            const accountExists = yield (0, wdfpData_1.getAccount)(binding.account_id);
+            const accountExists = (0, account_1.getAccountSync)(binding.account_id);
             if (accountExists) {
                 accountId = binding.account_id;
                 newAccount = false;
-                (0, wdfpData_1.updateAccountSync)({ id: accountId, lastLoginTime: new Date() });
-                try {
-                    (0, wdfpData_1.deleteSession)(String(accountId));
+                (0, account_1.updateAccountSync)({ id: accountId, lastLoginTime: new Date() });
+                // Clean all old sessions for this account, reuse first token
+                const sessions = (0, session_1.getAccountSessionsOfTypeSync)(accountId, types_1.SessionType.VIEWER);
+                if (sessions.length > 0) {
+                    viewerId = parseInt(sessions[0].token);
+                    (0, session_1.deleteAccountSessionsOfTypeSync)(accountId, types_1.SessionType.VIEWER);
                 }
-                catch (_) { }
             }
             else {
                 // Account was deleted — clean up stale binding and create new account
-                (0, wdfpData_1.deleteDeviceBindingSync)(deviceId);
-                const account = yield (0, wdfpData_1.insertAccount)({
+                (0, session_1.deleteDeviceBindingSync)(deviceId);
+                const account = (0, account_1.insertAccountSync)({
                     appId: "wf_cn", idpAlias: "", idpCode: "leiting", idpId: "", status: "normal"
                 });
                 accountId = account.id;
-                const player = (0, wdfpData_1.insertDefaultPlayerSync)(accountId);
+                const player = (0, player_1.insertDefaultPlayerSync)(accountId);
                 (0, activeAccount_1.saveAccountDefaultPlayer)(accountId, player.id);
-                (0, wdfpData_1.insertDeviceBindingSync)(deviceId, accountId);
+                (0, session_1.insertDeviceBindingSync)(deviceId, accountId);
             }
         }
         else {
-            // New device → create account with a BLANK player (upstream behaviour). The client then
-            // plays the tutorial from scratch (取名 → 十連 → 亞里沙 → 主畫面). Confirmed to run cleanly
-            // on the full CDN + FileReader .png placeholder guard, so the old C8601-dodging seed is gone.
-            const account = yield (0, wdfpData_1.insertAccount)({
+            // New device → create account
+            const account = (0, account_1.insertAccountSync)({
                 appId: "wf_cn", idpAlias: "", idpCode: "leiting", idpId: "", status: "normal"
             });
             accountId = account.id;
-            const player = (0, wdfpData_1.insertDefaultPlayerSync)(accountId);
+            const player = (0, player_1.insertDefaultPlayerSync)(accountId);
             (0, activeAccount_1.saveAccountDefaultPlayer)(accountId, player.id);
-            (0, wdfpData_1.insertDeviceBindingSync)(deviceId, accountId);
-            console.log(`[signup] NEW account#${accountId} + blank player#${player.id} (device_id=${deviceId})`);
+            (0, session_1.insertDeviceBindingSync)(deviceId, accountId);
         }
-        yield (0, wdfpData_1.insertSessionWithToken)({
-            token: String(accountId),
+        if (!viewerId) {
+            viewerId = (0, utils_1.generateViewerId)();
+        }
+        yield (0, session_1.insertSessionWithToken)({
+            token: String(viewerId),
             accountId: accountId,
             type: types_1.SessionType.VIEWER,
             expires: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
         });
-        viewerIdToAccountId.set(accountId, accountId);
+        viewerIdToAccountId.set(viewerId, accountId);
         reply.header("content-type", "application/x-msgpack");
         reply.status(200).send({
             data_headers: (0, utils_1.generateDataHeaders)({
-                viewer_id: accountId,
+                viewer_id: viewerId,
                 short_udid: shortUdid,
                 udid: udid,
             }),

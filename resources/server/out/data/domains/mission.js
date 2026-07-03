@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.insertPlayerActiveMissionsSync = exports.getPlayerActiveMissionsSync = exports.insertPlayerClearedRegularMissionListSync = exports.getPlayerClearedRegularMissionListSync = void 0;
+exports.updatePlayerActiveMissionStageSync = exports.updatePlayerActiveMissionSync = exports.insertPlayerActiveMissionsSync = exports.getPlayerActiveMissionsSync = exports.insertPlayerClearedRegularMissionListSync = exports.getPlayerClearedRegularMissionListSync = void 0;
 const db_1 = require("../db");
 const utils_1 = require("../utils");
 /**
@@ -158,3 +158,23 @@ function insertPlayerActiveMissionsSync(playerId, missions) {
     })();
 }
 exports.insertPlayerActiveMissionsSync = insertPlayerActiveMissionsSync;
+/**
+ * Updates the progress value of a single active mission.
+ */
+function updatePlayerActiveMissionSync(playerId, missionId, progress) {
+    (0, db_1.getDb)().prepare(`
+    INSERT OR REPLACE INTO players_active_missions (id, progress, player_id)
+    VALUES (?, ?, ?)
+    `).run(Number(missionId), progress, playerId);
+}
+exports.updatePlayerActiveMissionSync = updatePlayerActiveMissionSync;
+/**
+ * Updates the status of a single active mission stage (claimed/unclaimed).
+ */
+function updatePlayerActiveMissionStageSync(playerId, stageId, missionId, status) {
+    (0, db_1.getDb)().prepare(`
+    INSERT OR REPLACE INTO players_active_missions_stages (id, status, player_id, mission_id)
+    VALUES (?, ?, ?, ?)
+    `).run(Number(stageId), (0, utils_1.serializeBoolean)(status), playerId, Number(missionId));
+}
+exports.updatePlayerActiveMissionStageSync = updatePlayerActiveMissionStageSync;

@@ -9,6 +9,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const session_1 = require("../../data/domains/session");
 const utils_1 = require("../../utils");
 const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
     fastify.post("/start", (request, reply) => __awaiter(void 0, void 0, void 0, function* () {
@@ -17,6 +18,11 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         if (!viewerId || isNaN(viewerId))
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Invalid request body."
+            });
+        const session = yield (0, session_1.getSession)(viewerId.toString());
+        if (!session)
+            return reply.status(400).send({
+                "error": "Bad Request", "message": "Invalid viewer id."
             });
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({

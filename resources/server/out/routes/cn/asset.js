@@ -160,12 +160,21 @@ function loadPathManifest() {
 function rewriteArchiveLocation(loc, baseUrl) {
     const marker = "/upload_assets/";
     const i = loc.indexOf(marker);
-    return i >= 0 ? `${baseUrl}/${loc.slice(i + marker.length)}` : loc;
+    if (i < 0)
+        return loc;
+    // Keep the `<subdir>/<file>` tail (e.g. archive-common-full/pinball-....zip). When
+    // CDN_ARCHIVE_ORIGIN is set (launcher "cloud CDN" toggle → an R2/CDN base such as
+    // https://cdn.example.com/cn) the client downloads archives directly from that origin;
+    // empty/unset → served from our local /patch/cn baseUrl (default).
+    const tail = loc.slice(i + marker.length);
+    const origin = process.env.CDN_ARCHIVE_ORIGIN;
+    const base = origin ? origin.replace(/\/$/, "") : baseUrl;
+    return `${base}/${tail}`;
 }
 const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
     fastify.post("/version_info", (request, reply) => __awaiter(void 0, void 0, void 0, function* () {
         const baseUrl = getCdnBase(request);
-        reply.header("content-type", "application/x-msgpack");
+        reply.type("application/json");
         reply.status(200).send({
             data_headers: (0, utils_1.generateDataHeaders)(),
             data: getVersionInfo(baseUrl)
@@ -228,7 +237,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             ? diffArchives[diffArchives.length - 1].version
             : "1.4.0";
         const targetVer = resVer !== null && resVer !== void 0 ? resVer : highestDiff;
-        reply.header("content-type", "application/x-msgpack");
+        reply.type("application/json");
         reply.status(200).send({
             data_headers: (0, utils_1.generateDataHeaders)({ asset_update: true }),
             data: {

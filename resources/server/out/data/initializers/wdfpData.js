@@ -50,6 +50,12 @@ function init(database, exists) {
         free_mana INTEGER NOT NULL,
         paid_mana INTEGER NOT NULL,
         enable_auto_3x INTEGER NOT NULL,
+        total_stamina_used INTEGER NOT NULL DEFAULT 0,
+        total_powerflips INTEGER NOT NULL DEFAULT 0,
+        total_dashes INTEGER NOT NULL DEFAULT 0,
+        total_mana_obtained INTEGER NOT NULL DEFAULT 0,
+        max_combo_achieved INTEGER NOT NULL DEFAULT 0,
+        total_login_days INTEGER NOT NULL DEFAULT 0,
         account_id INTEGER NOT NULL,
         tutorial_step INTEGER,
         tutorial_skip_flag INTEGER,
@@ -62,12 +68,136 @@ function init(database, exists) {
         database.prepare(`ALTER TABLE players ADD COLUMN tutorial_gacha_character_id INTEGER DEFAULT NULL`).run();
     }
     catch ( /* column already exists */_a) { /* column already exists */ }
+    // migration: add total_stamina_used for mission progress tracking
+    try {
+        database.prepare(`ALTER TABLE players ADD COLUMN total_stamina_used INTEGER NOT NULL DEFAULT 0`).run();
+    }
+    catch ( /* column already exists */_b) { /* column already exists */ }
+    // migration: add powerflip/dash counters for mission progress
+    try {
+        database.prepare(`ALTER TABLE players ADD COLUMN total_powerflips INTEGER NOT NULL DEFAULT 0`).run();
+    }
+    catch ( /* column already exists */_c) { /* column already exists */ }
+    try {
+        database.prepare(`ALTER TABLE players ADD COLUMN total_dashes INTEGER NOT NULL DEFAULT 0`).run();
+    }
+    catch ( /* column already exists */_d) { /* column already exists */ }
+    // migration: add total_mana_obtained for mission progress tracking
+    try {
+        database.prepare(`ALTER TABLE players ADD COLUMN total_mana_obtained INTEGER NOT NULL DEFAULT 0`).run();
+    }
+    catch ( /* column already exists */_e) { /* column already exists */ }
+    // migration: max_combo_achieved (upstream added it to CREATE TABLE but forgot the ALTER — existing DBs
+    // that predate the combo-tracking feature 500 on /load without this). Idempotent try/catch like the rest.
+    try {
+        database.prepare(`ALTER TABLE players ADD COLUMN max_combo_achieved INTEGER NOT NULL DEFAULT 0`).run();
+    }
+    catch ( /* column already exists */_f) { /* column already exists */ }
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_character_quest_clears (
+        player_id INTEGER NOT NULL,
+        character_id INTEGER NOT NULL,
+        clear_count INTEGER NOT NULL DEFAULT 0,
+        multi_count INTEGER NOT NULL DEFAULT 0,
+        leader_clear_count INTEGER NOT NULL DEFAULT 0,
+        leader_multi_count INTEGER NOT NULL DEFAULT 0,
+        leader_power_flip_count INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (player_id, character_id),
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run();
+    // migration: add leader_clear_count for leader-specific awakening missions
+    try {
+        database.prepare(`ALTER TABLE players_character_quest_clears ADD COLUMN leader_clear_count INTEGER NOT NULL DEFAULT 0`).run();
+    }
+    catch ( /* column already exists */_g) { /* column already exists */ }
+    // migration: add leader_multi_count for co-op leader tracking
+    try {
+        database.prepare(`ALTER TABLE players_character_quest_clears ADD COLUMN leader_multi_count INTEGER NOT NULL DEFAULT 0`).run();
+    }
+    catch ( /* column already exists */_h) { /* column already exists */ }
+    // migration: add leader_character_id to quest_progress for quest-clear leader validation
+    try {
+        database.prepare(`ALTER TABLE players_quest_progress ADD COLUMN leader_character_id INTEGER`).run();
+    }
+    catch ( /* column already exists */_j) { /* column already exists */ }
+    // migration: add multi_clear_count for event mission multi-battle tracking
+    try {
+        database.prepare(`ALTER TABLE players_quest_progress ADD COLUMN multi_clear_count INTEGER NOT NULL DEFAULT 0`).run();
+    }
+    catch ( /* column already exists */_k) { /* column already exists */ }
+    // upstream added `unlocked` to the CREATE TABLE only (215cb6b6) but no ALTER — existing DBs
+    // predating it lack the column and 500 on /load (SELECT unlocked). Same pattern as max_combo.
+    try {
+        database.prepare(`ALTER TABLE players_quest_progress ADD COLUMN unlocked INTEGER NOT NULL DEFAULT 0`).run();
+    }
+    catch ( /* column already exists */_l) { /* column already exists */ }
+    // players_characters columns added to CREATE only (2024) without an ALTER — DBs predating them
+    // 500 on character read. Nullable, so existing rows just get NULL.
+    try {
+        database.prepare(`ALTER TABLE players_characters ADD COLUMN ex_boost_status_id INTEGER`).run();
+    }
+    catch ( /* column already exists */_m) { /* column already exists */ }
+    try {
+        database.prepare(`ALTER TABLE players_characters ADD COLUMN ex_boost_ability_id_list TEXT`).run();
+    }
+    catch ( /* column already exists */_o) { /* column already exists */ }
+    try {
+        database.prepare(`ALTER TABLE players_characters ADD COLUMN illustration_settings TEXT`).run();
+    }
+    catch ( /* column already exists */_p) { /* column already exists */ }
+    // migration: add leader_power_flip_count for per-character powerflip missions
+    try {
+        database.prepare(`ALTER TABLE players_character_quest_clears ADD COLUMN leader_power_flip_count INTEGER NOT NULL DEFAULT 0`).run();
+    }
+    catch ( /* column already exists */_q) { /* column already exists */ }
+    // migration: add total_login_days for weekly mission tracking
+    try {
+        database.prepare(`ALTER TABLE players ADD COLUMN total_login_days INTEGER NOT NULL DEFAULT 0`).run();
+    }
+    catch ( /* column already exists */_r) { /* column already exists */ }
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_party_member_co_clears (
+        player_id INTEGER NOT NULL,
+        char_id_a INTEGER NOT NULL,
+        char_id_b INTEGER NOT NULL,
+        co_clear_count INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (player_id, char_id_a, char_id_b),
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run();
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_party_race_clears (
+        player_id INTEGER NOT NULL,
+        race_key TEXT NOT NULL,
+        clear_count INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (player_id, race_key),
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run();
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_periodic_snapshots (
+        player_id INTEGER NOT NULL,
+        period_type TEXT NOT NULL,
+        quest_clears INTEGER NOT NULL DEFAULT 0,
+        stamina_used INTEGER NOT NULL DEFAULT 0,
+        rank_ss INTEGER NOT NULL DEFAULT 0,
+        rank_s INTEGER NOT NULL DEFAULT 0,
+        rank_a INTEGER NOT NULL DEFAULT 0,
+        rank_b INTEGER NOT NULL DEFAULT 0,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (player_id, period_type),
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run();
     database.prepare(`CREATE TABLE IF NOT EXISTS device_bindings (
         device_id INTEGER PRIMARY KEY,
         account_id INTEGER NOT NULL,
         last_seen DATE NOT NULL,
         FOREIGN KEY (account_id) REFERENCES accounts (id) ON DELETE CASCADE
     )`).run();
+    // migration: device_bindings.name for admin panel identification
+    try {
+        database.prepare(`ALTER TABLE device_bindings ADD COLUMN name TEXT DEFAULT NULL`).run();
+    }
+    catch ( /* column already exists */_s) { /* column already exists */ }
+    // migration: add awake_level for character awakening system
+    try {
+        database.prepare(`ALTER TABLE players_characters_mana_nodes ADD COLUMN awake_level INTEGER NOT NULL DEFAULT 0`).run();
+    }
+    catch ( /* column already exists */_t) { /* column already exists */ }
     database.prepare(`CREATE TABLE IF NOT EXISTS players_options (
         key TEXT NOT NULL,
         value INTEGER NOT NULL,
@@ -165,6 +295,7 @@ function init(database, exists) {
     )`).run();
     database.prepare(`CREATE TABLE IF NOT EXISTS players_characters_mana_nodes (
         value INTEGER NOT NULL,
+        awake_level INTEGER NOT NULL DEFAULT 0,
         character_id INTEGER NOT NULL,
         player_id INTEGER NOT NULL,
         PRIMARY KEY (value, character_id, player_id),
@@ -208,11 +339,11 @@ function init(database, exists) {
     try {
         database.prepare(`ALTER TABLE players_parties ADD COLUMN current_battle_power INTEGER NOT NULL DEFAULT 0`).run();
     }
-    catch ( /* column already exists */_b) { /* column already exists */ }
+    catch ( /* column already exists */_u) { /* column already exists */ }
     try {
         database.prepare(`ALTER TABLE players_parties ADD COLUMN before_battle_power INTEGER NOT NULL DEFAULT 0`).run();
     }
-    catch ( /* column already exists */_c) { /* column already exists */ }
+    catch ( /* column already exists */_v) { /* column already exists */ }
     // database.prepare(`CREATE TABLE IF NOT EXISTS players_party_options (
     //     allow_other_players_to_heal_me INTEGER NOT NULL,
     //     slot INTEGER NOT NULL,
@@ -241,6 +372,8 @@ function init(database, exists) {
         high_score INTEGER,
         clear_rank INTEGER,
         best_elapsed_time_ms INTEGER,
+        leader_character_id INTEGER,
+        multi_clear_count INTEGER NOT NULL DEFAULT 0,
         player_id INTEGER NOT NULL,
         PRIMARY KEY (section, quest_id, player_id),
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE

@@ -15,7 +15,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const fs_1 = require("fs");
 const path_1 = __importDefault(require("path"));
 const _1 = require(".");
-const wdfpData_1 = require("../../data/wdfpData");
+const account_1 = require("../../data/domains/account");
+const session_1 = require("../../data/domains/session");
+const player_1 = require("../../data/domains/player");
+const character_1 = require("../../data/domains/character");
+const quest_1 = require("../../data/domains/quest");
+const equipment_1 = require("../../data/domains/equipment");
+const item_1 = require("../../data/domains/item");
+const types_1 = require("../../data/types");
 const activeAccount_1 = require("../../data/activeAccount");
 const character_table_json_1 = __importDefault(require("../../../docs/generated/character_table.json"));
 const item_lookup_json_1 = __importDefault(require("../../../assets/item_lookup.json"));
@@ -37,61 +44,73 @@ function htmlEscape(s) {
 }
 const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
     fastify.get("/", (request, reply) => __awaiter(void 0, void 0, void 0, function* () {
-        var _a, _b;
+        var _a, _b, _c;
         let html = (0, fs_1.readFileSync)(path_1.default.join(__dirname, _1.staticPagesDir, "players.html")).toString("utf-8");
         const activePid = (0, activeAccount_1.getActivePlayerId)();
         const selectedAccountId = (0, activeAccount_1.getSelectedAccountId)();
         let listContent = '';
-        // Account management table
-        const accounts = (0, wdfpData_1.getAllAccountsSync)();
-        let accountRows = '';
-        for (const acc of accounts) {
-            const pids = (0, wdfpData_1.getAccountPlayersSync)(acc.id);
+        // Device binding table (replaces account management)
+        const deviceBindings = (0, session_1.getAllDeviceBindingsSync)();
+        let deviceRows = '';
+        for (const dev of deviceBindings) {
+            const pids = (0, account_1.getAccountPlayersSync)(dev.account_id);
             const saveCount = pids.length;
-            // Use per-account default player instead of global activePlayerId
-            const defaultPid = (0, activeAccount_1.getAccountDefaultPlayer)(acc.id);
-            const activeName = defaultPid ? (htmlEscape(((_a = (0, wdfpData_1.getPlayerSync)(defaultPid)) === null || _a === void 0 ? void 0 : _a.name) || '-')) : '-';
-            accountRows += `<tr>
-                <td>${acc.id}</td>
+            const defaultPid = (0, activeAccount_1.getAccountDefaultPlayer)(dev.account_id);
+            const activeName = defaultPid ? (htmlEscape(((_a = (0, player_1.getPlayerSync)(defaultPid)) === null || _a === void 0 ? void 0 : _a.name) || '-')) : '-';
+            const devName = htmlEscape(dev.name || '');
+            const session = (0, session_1.getSessionByAccountIdSync)(dev.account_id, types_1.SessionType.VIEWER);
+            const viewerIdStr = session ? htmlEscape(session.token) : '-';
+            deviceRows += `<tr>
+                <td class="text-xs text-on-surface-variant">${dev.device_id}</td>
+                <td class="text-xs text-on-surface-variant">${viewerIdStr}</td>
+                <td>
+                    <input value="${devName}" placeholder="名称"
+                           class="edit-field text-xs border border-outline-variant rounded px-1 py-0.5 w-24 bg-background text-on-background"
+                           data-device="${dev.device_id}" data-field="name">
+                </td>
                 <td>${saveCount}</td>
                 <td>${activeName}</td>
                 <td>
-                    <form method="post" action="/api/server/selectAccount?accountId=${acc.id}" style="display:inline">
+                    <form method="post" action="/api/server/selectAccount?accountId=${dev.account_id}" style="display:inline">
                         <button type="submit" class="text-xs bg-primary text-on-primary px-2 py-1 rounded-full">查看存档</button>
                     </form>
-                    <form method="post" action="/api/server/newSave?accountId=${acc.id}" style="display:inline">
+                    <form method="post" action="/api/server/newSave?accountId=${dev.account_id}" style="display:inline">
                         <button type="submit" class="text-xs bg-primary text-on-primary px-2 py-1 rounded-full">新建存档</button>
                     </form>
-                    <form method="post" action="/api/server/deleteAccount?id=${acc.id}" style="display:inline" onsubmit="return confirm('删除账号 ${acc.id} 及所有存档？')">
+                    <form method="post" action="/api/server/deleteAccount?id=${dev.account_id}" style="display:inline" onsubmit="return confirm('删除账号及所有存档？')">
                         <button type="submit" class="text-xs text-error px-2 py-1 rounded-full border border-error">删除</button>
                     </form>
                 </td>
             </tr>`;
         }
         listContent += `<section class="flex flex-col p-5 border border-outline-variant rounded-3xl w-full gap-3">
-            <h3 class="text-xl text-on-background font-semibold">账号管理</h3>
+            <h3 class="text-xl text-on-background font-semibold">设备绑定 / 账号管理</h3>
             <table class="w-full text-sm"><thead><tr class="text-left border-b border-outline-variant">
-                <th class="p-1">ID</th><th class="p-1">存档数</th><th class="p-1">生效存档</th><th class="p-1">操作</th>
-            </tr></thead><tbody>${accountRows || '<tr><td colspan="4" class="text-on-surface-variant p-2">暂无账号</td></tr>'}</tbody></table>
+                <th class="p-1">设备 ID</th><th class="p-1">账号ID</th><th class="p-1">名称</th><th class="p-1">存档数</th><th class="p-1">生效存档</th><th class="p-1">操作</th>
+            </tr></thead><tbody>${deviceRows || '<tr><td colspan="6" class="text-on-surface-variant p-2">暂无设备绑定</td></tr>'}</tbody></table>
         </section>`;
         // Save management table (for selected account)
         if (selectedAccountId !== null) {
-            const pids = (0, wdfpData_1.getAccountPlayersSync)(selectedAccountId);
+            const devName = htmlEscape(((_b = deviceBindings.find(d => d.account_id === selectedAccountId)) === null || _b === void 0 ? void 0 : _b.name) || '');
+            const session = (0, session_1.getSessionByAccountIdSync)(selectedAccountId, types_1.SessionType.VIEWER);
+            const viewerId = (session === null || session === void 0 ? void 0 : session.token) || String(selectedAccountId);
+            const accountLabel = devName ? `${viewerId}（${devName}）` : viewerId;
+            const pids = (0, account_1.getAccountPlayersSync)(selectedAccountId);
             let saveRows = '';
             for (const pid of pids) {
-                const player = (0, wdfpData_1.getPlayerSync)(pid);
+                const player = (0, player_1.getPlayerSync)(pid);
                 if (!player)
                     continue;
                 const name = htmlEscape(player.name || `Player${pid}`);
                 const level = player.degreeId || 1;
-                const charCount = Object.keys((0, wdfpData_1.getPlayerCharactersSync)(pid)).length;
+                const charCount = Object.keys((0, character_1.getPlayerCharactersSync)(pid)).length;
                 const isActive = activePid === pid;
                 saveRows += `<tr class="${isActive ? 'bg-primary/10' : ''}">
                     <td>${pid}</td>
                     <td><a href="/player/${pid}" class="text-primary underline">${name}</a></td>
                     <td>Lv.${level}</td>
                     <td>${charCount}</td>
-                    <td>${formatTime((_b = player.timeOffset) !== null && _b !== void 0 ? _b : null)}</td>
+                    <td>${formatTime((_c = player.timeOffset) !== null && _c !== void 0 ? _c : null)}</td>
                     <td>
                         <form method="post" action="/api/server/activateSave?playerId=${pid}" style="display:inline">
                             <button type="submit" class="text-xs bg-primary text-on-primary px-2 py-1 rounded-full">${isActive ? '当前' : '切换'}</button>
@@ -111,14 +130,14 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 </tr>`;
             }
             listContent += `<section class="flex flex-col p-5 border border-outline-variant rounded-3xl w-full gap-3">
-                <h3 class="text-xl text-on-background font-semibold">account ${selectedAccountId} 的存档</h3>
+                <h3 class="text-xl text-on-background font-semibold">账号 ${accountLabel} 的存档</h3>
                 <table class="w-full text-sm"><thead><tr class="text-left border-b border-outline-variant">
-                    <th class="p-1">ID</th><th class="p-1">名字</th><th class="p-1">等级</th><th class="p-1">角色数</th><th class="p-1">存档时间</th><th class="p-1">操作</th>
+                    <th class="p-1">存档ID</th><th class="p-1">名字</th><th class="p-1">等级</th><th class="p-1">角色数</th><th class="p-1">存档时间</th><th class="p-1">操作</th>
                 </tr></thead><tbody>${saveRows || '<tr><td colspan="6" class="text-on-surface-variant p-2">暂无存档</td></tr>'}</tbody></table>
             </section>`;
         }
         // Player list
-        const players = (0, wdfpData_1.getAllPlayersSync)();
+        const players = (0, player_1.getAllPlayersSync)();
         if (players.length === 0) {
             listContent += `<h4 class="text-xl w-full text-center font-bold">暂无玩家</h4>`;
         }
@@ -148,13 +167,13 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         reply.send(html);
     }));
     fastify.get("/:playerId", (request, reply) => __awaiter(void 0, void 0, void 0, function* () {
-        var _c, _d, _e, _f;
+        var _d, _e, _f, _g;
         const { playerId } = request.params;
         const { error } = request.query;
         const parsedPlayerId = Number(playerId);
         if (isNaN(parsedPlayerId))
             return reply.redirect("/player");
-        const player = (0, wdfpData_1.getPlayerSync)(parsedPlayerId);
+        const player = (0, player_1.getPlayerSync)(parsedPlayerId);
         if (player === null)
             return reply.redirect("/player");
         let html = (0, fs_1.readFileSync)(path_1.default.join(__dirname, _1.staticPagesDir, "player.html")).toString("utf-8");
@@ -185,7 +204,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         html = html.replace("{{resources}}", resourcesHtml);
         html = html.replace("{{resourceCols}}", "grid-cols-4");
         // Character list — sorted by joinTime DESC
-        const characters = (0, wdfpData_1.getPlayerCharactersSync)(parsedPlayerId);
+        const characters = (0, character_1.getPlayerCharactersSync)(parsedPlayerId);
         const charList = Object.entries(characters).sort((a, b) => b[1].joinTime.getTime() - a[1].joinTime.getTime());
         let charsHtml = '';
         for (const [code, char] of charList) {
@@ -210,7 +229,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         html = html.replace("{{characterRows}}", charsHtml || '<tr><td colspan="6" class="text-on-surface-variant p-2">暂无角色</td></tr>');
         html = html.replace("{{characterCount}}", String(charList.length));
         // Items
-        const items = (0, wdfpData_1.getPlayerItemsSync)(parsedPlayerId);
+        const items = (0, item_1.getPlayerItemsSync)(parsedPlayerId);
         let itemsHtml = '';
         for (const [itemId, count] of Object.entries(items)) {
             const itemName = item_lookup_json_1.default[itemId] || '-';
@@ -223,7 +242,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         }
         html = html.replace("{{itemRows}}", itemsHtml || '<tr><td colspan="4" class="text-on-surface-variant p-2">暂无道具</td></tr>');
         // Equipment
-        const equipment = (0, wdfpData_1.getPlayerEquipmentListSync)(parsedPlayerId);
+        const equipment = (0, equipment_1.getPlayerEquipmentListSync)(parsedPlayerId);
         let equipHtml = '';
         for (const [eqId, eq] of Object.entries(equipment)) {
             const info = equipment_lookup_json_1.default[eqId];
@@ -241,7 +260,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         }
         html = html.replace("{{equipRows}}", equipHtml || '<tr><td colspan="6" class="text-on-surface-variant p-2">暂无装备</td></tr>');
         // Quest Progress
-        const questProgress = (0, wdfpData_1.getPlayerQuestProgressSync)(parsedPlayerId);
+        const questProgress = (0, quest_1.getPlayerQuestProgressSync)(parsedPlayerId);
         let qpHtml = '';
         let qpCount = 0;
         for (const [section, quests] of Object.entries(questProgress)) {
@@ -254,9 +273,9 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                     <td class="p-1 text-xs text-on-surface-variant">${section}</td>
                     <td class="p-1 text-xs text-on-surface-variant">${qp.questId}</td>
                     <td class="p-1">${qp.finished ? '✅' : '—'}</td>
-                    <td class="p-1">${(_c = qp.highScore) !== null && _c !== void 0 ? _c : '—'}</td>
-                    <td class="p-1">${(_d = qp.clearRank) !== null && _d !== void 0 ? _d : '—'}</td>
-                    <td class="p-1">${(_e = qp.bestElapsedTimeMs) !== null && _e !== void 0 ? _e : '—'}</td>
+                    <td class="p-1">${(_d = qp.highScore) !== null && _d !== void 0 ? _d : '—'}</td>
+                    <td class="p-1">${(_e = qp.clearRank) !== null && _e !== void 0 ? _e : '—'}</td>
+                    <td class="p-1">${(_f = qp.bestElapsedTimeMs) !== null && _f !== void 0 ? _f : '—'}</td>
                     <td class="p-1"><button class="js-action text-xs text-error border border-error rounded-full px-2" data-action="delQuestProgress" data-section="${section}" data-quest-id="${qp.questId}">✕</button></td>
                 </tr>`;
             }
@@ -264,7 +283,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         html = html.replace("{{questProgressRows}}", qpHtml || '<tr><td colspan="8" class="text-on-surface-variant p-2">暂无关卡记录</td></tr>');
         html = html.replace("{{questProgressCount}}", String(qpCount));
         // Drawn Quests
-        const drawnQuests = (0, wdfpData_1.getPlayerDrawnQuestsSync)(parsedPlayerId);
+        const drawnQuests = (0, quest_1.getPlayerDrawnQuestsSync)(parsedPlayerId);
         let dqHtml = '';
         for (const dq of drawnQuests) {
             const qkey = `${dq.categoryId}_${dq.questId}`;
@@ -280,7 +299,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         html = html.replace("{{drawnQuestRows}}", dqHtml || '<tr><td colspan="5" class="text-on-surface-variant p-2">暂无抽选记录</td></tr>');
         html = html.replace("{{drawnQuestCount}}", String(drawnQuests.length));
         // Account settings
-        html = html.replace("{{tutorialStep}}", String((_f = player.tutorialStep) !== null && _f !== void 0 ? _f : ''));
+        html = html.replace("{{tutorialStep}}", String((_g = player.tutorialStep) !== null && _g !== void 0 ? _g : ''));
         html = html.replace("{{auto3x}}", player.enableAuto3x ? 'checked' : '');
         html = html.replace("{{birth}}", String(player.birth));
         html = html.replace("{{degreeId}}", String(player.degreeId));

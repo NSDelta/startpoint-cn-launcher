@@ -10,7 +10,10 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const wdfpData_1 = require("../../data/wdfpData");
+const boxGacha_1 = require("../../data/domains/boxGacha");
+const item_1 = require("../../data/domains/item");
+const player_1 = require("../../data/domains/player");
+const session_1 = require("../../data/domains/session");
 const activeAccount_1 = require("../../data/activeAccount");
 const utils_1 = require("../../utils");
 const assets_1 = require("../../lib/assets");
@@ -30,8 +33,8 @@ function getAllBoxList(playerId, boxGachaId, boxes, skipBoxId) {
         // get drawn rewards
         const parsedBoxId = Number(boxId);
         if (parsedBoxId !== skipBoxId) {
-            const playerBoxData = (0, wdfpData_1.getPlayerBoxGachaSync)(playerId, boxGachaId, parsedBoxId);
-            const playerDrawnRewards = (0, wdfpData_1.getPlayerBoxGachaDrawnRewardsSync)(playerId, boxGachaId, parsedBoxId);
+            const playerBoxData = (0, boxGacha_1.getPlayerBoxGachaSync)(playerId, boxGachaId, parsedBoxId);
+            const playerDrawnRewards = (0, boxGacha_1.getPlayerBoxGachaDrawnRewardsSync)(playerId, boxGachaId, parsedBoxId);
             boxInfo.push({
                 "box_id": parsedBoxId,
                 "reset_times": (_a = playerBoxData === null || playerBoxData === void 0 ? void 0 : playerBoxData.resetTimes) !== null && _a !== void 0 ? _a : 0,
@@ -60,7 +63,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Bad Request",
                 "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -81,7 +84,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "message": "Invalid box gacha id."
             });
         // get the box's data.
-        const playerBoxData = (0, wdfpData_1.getPlayerBoxGachaSync)(playerId, boxGachaId, boxId);
+        const playerBoxData = (0, boxGacha_1.getPlayerBoxGachaSync)(playerId, boxGachaId, boxId);
         if (playerBoxData === null)
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -94,14 +97,14 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "message": "Box is already closed."
             });
         // set box to be closed
-        (0, wdfpData_1.updatePlayerBoxGachaSync)(playerId, boxGachaId, {
+        (0, boxGacha_1.updatePlayerBoxGachaSync)(playerId, boxGachaId, {
             boxId: boxId,
             isClosed: true
         });
         // get all boxes
         const allBoxDataList = getAllBoxList(playerId, boxGachaId, boxGachaData.boxes, boxId);
         // add box that we just closed to all box data.
-        const playerDrawnRewards = (0, wdfpData_1.getPlayerBoxGachaDrawnRewardsSync)(playerId, boxGachaId, boxId);
+        const playerDrawnRewards = (0, boxGacha_1.getPlayerBoxGachaDrawnRewardsSync)(playerId, boxGachaId, boxId);
         allBoxDataList.push({
             "box_id": boxId,
             "reset_times": (_a = playerBoxData === null || playerBoxData === void 0 ? void 0 : playerBoxData.resetTimes) !== null && _a !== void 0 ? _a : 0,
@@ -138,7 +141,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Bad Request",
                 "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -146,7 +149,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             });
         // get player
         const playerId = (0, activeAccount_1.resolvePlayerIdSync)(viewerIdSession.accountId);
-        const player = playerId !== null ? (0, wdfpData_1.getPlayerSync)(playerId) : null;
+        const player = playerId !== null ? (0, player_1.getPlayerSync)(playerId) : null;
         if (player === null)
             return reply.status(500).send({
                 "error": "Internal Server Error",
@@ -161,7 +164,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             });
         // make sure the player has enough currency
         const pullCurrencyId = boxGachaData.redeemItemId;
-        const playerPullCurrency = (0, wdfpData_1.getPlayerItemSync)(playerId, pullCurrencyId);
+        const playerPullCurrency = (0, item_1.getPlayerItemSync)(playerId, pullCurrencyId);
         if (playerPullCurrency === null)
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -180,13 +183,13 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Bad Request",
                 "message": "Invalid box ID."
             });
-        const playerBoxData = (0, wdfpData_1.getPlayerBoxGachaSync)(playerId, boxGachaId, boxId);
+        const playerBoxData = (0, boxGacha_1.getPlayerBoxGachaSync)(playerId, boxGachaId, boxId);
         if (playerBoxData !== null && playerBoxData.isClosed)
             return reply.status(400).send({
                 "error": "Bad Request",
                 "message": "Box is closed."
             });
-        const playerDrawnRewards = (0, wdfpData_1.getPlayerBoxGachaDrawnRewardsSync)(playerId, boxGachaId, boxId);
+        const playerDrawnRewards = (0, boxGacha_1.getPlayerBoxGachaDrawnRewardsSync)(playerId, boxGachaId, boxId);
         // perform the draws
         const drawResult = (0, gacha_1.drawBoxGachaSync)(boxRewards, playerDrawnRewards, pullCount, stopOnFeaturedRewards);
         const drawnRewards = drawResult.rewards;
@@ -212,7 +215,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         const remainingDrawsNumber = ((_c = boxGachaData.availableCounts[boxId]) !== null && _c !== void 0 ? _c : totalDrawCount) - totalDrawCount;
         const shouldClose = remainingDrawsNumber === 0;
         if (playerBoxData === null) {
-            (0, wdfpData_1.insertPlayerBoxGachaSync)(playerId, boxGachaId, {
+            (0, boxGacha_1.insertPlayerBoxGachaSync)(playerId, boxGachaId, {
                 boxId: boxId,
                 isClosed: shouldClose,
                 remainingNumber: remainingDrawsNumber,
@@ -221,7 +224,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         }
         else {
             // auto close the box if the remaining draws are 0
-            (0, wdfpData_1.updatePlayerBoxGachaSync)(playerId, boxGachaId, {
+            (0, boxGacha_1.updatePlayerBoxGachaSync)(playerId, boxGachaId, {
                 boxId: boxId,
                 isClosed: shouldClose,
                 remainingNumber: remainingDrawsNumber
@@ -232,17 +235,17 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             const id = drawnReward.id;
             const existing = playerDrawnRewardMap.get(drawnReward.id);
             if (existing === undefined) {
-                (0, wdfpData_1.insertPlayerBoxGachaDrawnRewardSync)(playerId, boxGachaId, boxId, {
+                (0, boxGacha_1.insertPlayerBoxGachaDrawnRewardSync)(playerId, boxGachaId, boxId, {
                     id: id,
                     number: drawnReward.number
                 });
             }
             else {
-                (0, wdfpData_1.updatePlayerBoxGachaDrawnRewardSync)(playerId, boxGachaId, boxId, id, existing + drawnReward.number);
+                (0, boxGacha_1.updatePlayerBoxGachaDrawnRewardSync)(playerId, boxGachaId, boxId, id, existing + drawnReward.number);
             }
         }
         // update currency
-        (0, wdfpData_1.updatePlayerItemSync)(playerId, pullCurrencyId, newPullCurrency);
+        (0, item_1.updatePlayerItemSync)(playerId, pullCurrencyId, newPullCurrency);
         // generate totalDrawnRewards array
         const allBoxInfo = getAllBoxList(playerId, boxGachaId, boxGachaData.boxes, boxId);
         // add current box to allBoxInfo
@@ -299,7 +302,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Bad Request",
                 "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -307,7 +310,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             });
         // get player
         const playerId = (0, activeAccount_1.resolvePlayerIdSync)(viewerIdSession.accountId);
-        const player = playerId !== null ? (0, wdfpData_1.getPlayerSync)(playerId) : null;
+        const player = playerId !== null ? (0, player_1.getPlayerSync)(playerId) : null;
         if (player === null)
             return reply.status(500).send({
                 "error": "Internal Server Error",

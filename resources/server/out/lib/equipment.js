@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.givePlayerEquipmentSync = exports.clientSerializeEquipment = void 0;
-const wdfpData_1 = require("../data/wdfpData");
+exports.givePlayerEquipmentSync = exports.buildFullEquipmentList = exports.clientSerializeEquipment = void 0;
+const equipment_1 = require("../data/domains/equipment");
 /**
  * Serializes a PlayerEquipment object for sending to the game client.
  *
@@ -11,8 +11,6 @@ const wdfpData_1 = require("../data/wdfpData");
  */
 function clientSerializeEquipment(equipmentId, toSerialize) {
     return {
-        "null": 1,
-        "viewer_id": 0,
         "equipment_id": equipmentId,
         "protection": toSerialize.protection,
         "level": toSerialize.level,
@@ -21,6 +19,20 @@ function clientSerializeEquipment(equipmentId, toSerialize) {
     };
 }
 exports.clientSerializeEquipment = clientSerializeEquipment;
+/**
+ * Builds a full equipment list array for client response.
+ * Used by all equipment endpoints (sell, upgrade, dismantle) to return a
+ * complete snapshot of the player's equipment after any modifications.
+ */
+function buildFullEquipmentList(playerId) {
+    const allEquipment = (0, equipment_1.getPlayerEquipmentListSync)(playerId);
+    const list = [];
+    for (const [equipId, equip] of Object.entries(allEquipment)) {
+        list.push(clientSerializeEquipment(parseInt(equipId), equip));
+    }
+    return list;
+}
+exports.buildFullEquipmentList = buildFullEquipmentList;
 /**
  * Gives a player an amount of equipment.
  *
@@ -31,7 +43,7 @@ exports.clientSerializeEquipment = clientSerializeEquipment;
  */
 function givePlayerEquipmentSync(playerId, equipmentId, amount) {
     amount = Math.abs(amount); // ensure that amount isn't negative.
-    let owned = (0, wdfpData_1.getPlayerEquipmentSync)(playerId, equipmentId);
+    let owned = (0, equipment_1.getPlayerEquipmentSync)(playerId, equipmentId);
     if (owned === null) {
         // insert into inventory since it's not owned.
         owned = {
@@ -40,12 +52,12 @@ function givePlayerEquipmentSync(playerId, equipmentId, amount) {
             protection: false,
             stack: amount - 1
         };
-        (0, wdfpData_1.insertPlayerEquipmentSync)(playerId, equipmentId, owned);
+        (0, equipment_1.insertPlayerEquipmentSync)(playerId, equipmentId, owned);
     }
     else {
         // simply increase the stack
         const newStack = owned.stack + amount;
-        (0, wdfpData_1.updatePlayerEquipmentSync)(playerId, equipmentId, {
+        (0, equipment_1.updatePlayerEquipmentSync)(playerId, equipmentId, {
             stack: newStack
         });
         owned.stack = newStack;

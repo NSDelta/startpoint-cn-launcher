@@ -23,7 +23,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getPlayerTimeOffsetSync = exports.resolvePlayerIdSync = exports.saveAccountDefaultPlayer = exports.getAccountDefaultPlayer = exports.restoreTimeOffset = exports.saveTimeOffset = exports.setSelectedAccountId = exports.getSelectedAccountId = exports.setActivePlayerId = exports.getActivePlayerId = void 0;
+exports.getPlayerTimeOffsetSync = exports.resolvePlayerIdSync = exports.clearAccountDefaultPlayer = exports.saveAccountDefaultPlayer = exports.getAccountDefaultPlayer = exports.restoreTimeOffset = exports.saveTimeOffset = exports.setSelectedAccountId = exports.getSelectedAccountId = exports.setActivePlayerId = exports.getActivePlayerId = void 0;
 /**
  * Web 面板状态管理：当前活跃存档。
  * 持久化到 .database/active_account.json
@@ -88,7 +88,7 @@ function saveTimeOffset(offset) {
     const pid = state.activePlayerId;
     if (pid) {
         try {
-            const { getDb } = require("./wdfpData");
+            const { getDb } = require("./db");
             getDb().prepare(`UPDATE players SET time_offset = ? WHERE id = ?`).run(offset, pid);
         }
         catch (_a) { }
@@ -139,6 +139,18 @@ function saveAccountDefaultPlayer(accountId, playerId) {
 }
 exports.saveAccountDefaultPlayer = saveAccountDefaultPlayer;
 /**
+ * Removes the stored default-player mapping for an account (used when the account/save is deleted,
+ * so a future account reusing the id doesn't inherit a stale default-player pointer).
+ */
+function clearAccountDefaultPlayer(accountId) {
+    const state = readState();
+    if (state.defaultPlayers[accountId] !== undefined) {
+        delete state.defaultPlayers[accountId];
+        writeState(state);
+    }
+}
+exports.clearAccountDefaultPlayer = clearAccountDefaultPlayer;
+/**
  * Resolves the active player ID for an account.
  * Uses per-account defaultPlayers, falls back to first player.
  * Returns null if the account has no players.
@@ -158,7 +170,7 @@ exports.resolvePlayerIdSync = resolvePlayerIdSync;
 function getPlayerTimeOffsetSync(playerId) {
     var _a;
     try {
-        const { getDb } = require("./wdfpData");
+        const { getDb } = require("./db");
         const row = getDb().prepare(`SELECT time_offset FROM players WHERE id = ?`).get(playerId);
         return (_a = row === null || row === void 0 ? void 0 : row.time_offset) !== null && _a !== void 0 ? _a : null;
     }

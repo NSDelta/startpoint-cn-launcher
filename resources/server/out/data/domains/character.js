@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.insertPlayerCharactersManaNodesSync = exports.insertPlayerCharacterManaNodesSync = exports.hasPlayerUnlockedCharacterManaNodeSync = exports.getPlayerCharacterManaNodesSync = exports.getPlayerCharactersManaNodesSync = exports.updatePlayerCharacterSync = exports.insertPlayerCharactersSync = exports.insertDefaultPlayerCharacterSync = exports.insertPlayerCharacterSync = exports.updatePlayerCharacterBondTokenSync = exports.insertPlayerCharacterBondTokenSync = exports.getPlayerCharactersSync = exports.getPlayerCharacterSync = exports.playerOwnsCharacterSync = void 0;
+exports.updatePlayerCharacterManaNodeAwakeLevelSync = exports.getPlayerCharactersManaNodeAwakeLevelsSync = exports.insertPlayerCharactersManaNodesSync = exports.insertPlayerCharacterManaNodesSync = exports.hasPlayerUnlockedCharacterManaNodeSync = exports.getPlayerCharacterManaNodesSync = exports.getPlayerCharactersManaNodesSync = exports.updatePlayerCharacterSync = exports.insertPlayerCharactersSync = exports.insertDefaultPlayerCharacterSync = exports.insertPlayerCharacterSync = exports.updatePlayerCharacterBondTokenSync = exports.insertPlayerCharacterBondTokenSync = exports.getPlayerCharactersSync = exports.getPlayerCharacterSync = exports.playerOwnsCharacterSync = void 0;
 const db_1 = require("../db");
 const utils_1 = require("../utils");
 const assets_1 = require("../../lib/assets");
@@ -379,3 +379,44 @@ function insertPlayerCharactersManaNodesSync(playerId, charactersManaNodes) {
     })();
 }
 exports.insertPlayerCharactersManaNodesSync = insertPlayerCharactersManaNodesSync;
+/**
+ * Gets the awake_level values for all mana nodes owned by a player.
+ *
+ * @param playerId The ID of the player.
+ * @returns A record mapping character_id → { node_id → awake_level }.
+ */
+function getPlayerCharactersManaNodeAwakeLevelsSync(playerId) {
+    var _a;
+    const rawNodes = (0, db_1.getDb)().prepare(`
+    SELECT value, character_id, awake_level
+    FROM players_characters_mana_nodes
+    WHERE player_id = ?
+    `).all(playerId);
+    const result = {};
+    for (const rawNode of rawNodes) {
+        const charId = rawNode.character_id.toString();
+        if (!result[charId])
+            result[charId] = {};
+        result[charId][rawNode.value] = (_a = rawNode.awake_level) !== null && _a !== void 0 ? _a : 0;
+    }
+    return result;
+}
+exports.getPlayerCharactersManaNodeAwakeLevelsSync = getPlayerCharactersManaNodeAwakeLevelsSync;
+/**
+ * Updates the awake_level for a player's character mana node.
+ * Uses INSERT OR REPLACE to handle nodes that may already exist (from learn_mana_node)
+ * or may not exist yet (first-time awaken).
+ *
+ * @param playerId The ID of the player.
+ * @param characterId The character's ID.
+ * @param manaNodeId The mana node multiplied_id.
+ * @param awakeLevel The new awake_level to set.
+ */
+function updatePlayerCharacterManaNodeAwakeLevelSync(playerId, characterId, manaNodeId, awakeLevel) {
+    (0, db_1.getDb)().prepare(`
+    UPDATE players_characters_mana_nodes
+    SET awake_level = ?
+    WHERE value = ? AND character_id = ? AND player_id = ?
+    `).run(awakeLevel, manaNodeId, characterId, playerId);
+}
+exports.updatePlayerCharacterManaNodeAwakeLevelSync = updatePlayerCharacterManaNodeAwakeLevelSync;

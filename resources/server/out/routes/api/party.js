@@ -9,7 +9,11 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const wdfpData_1 = require("../../data/wdfpData");
+const player_1 = require("../../data/domains/player");
+const session_1 = require("../../data/domains/session");
+const character_1 = require("../../data/domains/character");
+const equipment_1 = require("../../data/domains/equipment");
+const party_1 = require("../../data/domains/party");
 const utils_1 = require("../../utils");
 const activeAccount_1 = require("../../data/activeAccount");
 const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
@@ -21,7 +25,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Bad Request",
                 "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -53,7 +57,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Bad Request",
                 "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -61,7 +65,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             });
         // get player
         const playerId = (0, activeAccount_1.resolvePlayerIdSync)(viewerIdSession.accountId);
-        const player = playerId !== null ? (0, wdfpData_1.getPlayerSync)(playerId) : null;
+        const player = playerId !== null ? (0, player_1.getPlayerSync)(playerId) : null;
         if (player === null)
             return reply.status(500).send({
                 "error": "Internal Server Error",
@@ -75,7 +79,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         };
         // store full global PartyId so /load returns the correct group+slot combo
         if (player.partySlot !== body.main_party_id) {
-            (0, wdfpData_1.updatePlayerSync)({
+            (0, player_1.updatePlayerSync)({
                 id: playerId,
                 partySlot: body.main_party_id
             });
@@ -91,7 +95,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         const mapOwnedCharacters = (characterId) => {
             let isOwned = characterId === null ? false : characterOwnedMap[characterId];
             if (isOwned === undefined) {
-                isOwned = (0, wdfpData_1.playerOwnsCharacterSync)(playerId, characterId);
+                isOwned = (0, character_1.playerOwnsCharacterSync)(playerId, characterId);
                 characterOwnedMap[characterId] = isOwned;
             }
             return isOwned ? characterId : null;
@@ -99,7 +103,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         const mapOwnedEquipment = (equipmentId) => {
             let isOwned = equipmentId === null ? false : equipmentOwnedMap[equipmentId];
             if (isOwned === undefined) {
-                isOwned = (0, wdfpData_1.playerOwnsEquipmentSync)(playerId, equipmentId);
+                isOwned = (0, equipment_1.playerOwnsEquipmentSync)(playerId, equipmentId);
                 equipmentOwnedMap[equipmentId] = isOwned;
             }
             return isOwned ? equipmentId : null;
@@ -107,7 +111,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         for (const updateInfo of body.party_info_list) {
             const parsed = parsePartyId(updateInfo.party_id);
             console.log(`[PARTY] edit: player=${playerId} id=${updateInfo.party_id} -> group=${parsed.groupId} slot=${parsed.slot} name="${updateInfo.party_name}" chars=${((_a = updateInfo.character_ids) === null || _a === void 0 ? void 0 : _a.filter(Boolean).length) || 0}`);
-            (0, wdfpData_1.updatePlayerPartySync)(playerId, parsed.slot, {
+            (0, party_1.updatePlayerPartySync)(playerId, parsed.slot, {
                 name: updateInfo.party_name,
                 unisonCharacterIds: updateInfo.unison_character_ids.map(mapOwnedCharacters),
                 characterIds: updateInfo.character_ids.map(mapOwnedCharacters),

@@ -9,13 +9,15 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const wdfpData_1 = require("../../data/wdfpData");
+const quest_1 = require("../../data/domains/quest");
+const player_1 = require("../../data/domains/player");
+const session_1 = require("../../data/domains/session");
 const activeAccount_1 = require("../../data/activeAccount");
 const assets_1 = require("../../lib/assets");
-const quest_1 = require("../../lib/quest");
+const quest_2 = require("../../lib/quest");
 const utils_1 = require("../../utils");
 function processStoryQuestFinish(playerId, viewerId, questSection, questId) {
-    const playerData = (0, wdfpData_1.getPlayerSync)(playerId);
+    const playerData = (0, player_1.getPlayerSync)(playerId);
     if (playerData === null)
         return null;
     const questData = (0, assets_1.getQuestFromCategorySync)(questSection, questId);
@@ -27,19 +29,19 @@ function processStoryQuestFinish(playerId, viewerId, questSection, questId) {
         console.log(`[STORY] battle quest rejected: category=${questSection} questId=${questId}`);
         return null;
     }
-    const questProgress = (0, wdfpData_1.getPlayerSingleQuestProgressSync)(playerId, questSection, questId);
+    const questProgress = (0, quest_1.getPlayerSingleQuestProgressSync)(playerId, questSection, questId);
     const finished = questProgress !== null ? questProgress.finished : false;
-    const rewardResult = !finished && questData.clearReward !== undefined ? (0, quest_1.givePlayerRewardSync)(playerId, questData.clearReward) : null;
+    const rewardResult = !finished && questData.clearReward !== undefined ? (0, quest_2.givePlayerRewardSync)(playerId, questData.clearReward) : null;
     if (!finished) {
         if (questProgress === null) {
-            (0, wdfpData_1.insertPlayerQuestProgressSync)(playerId, questSection, {
+            (0, quest_1.insertPlayerQuestProgressSync)(playerId, questSection, {
                 questId: questId,
                 finished: true,
                 clearRank: 5
             });
         }
         else {
-            (0, wdfpData_1.updatePlayerQuestProgressSync)(playerId, questSection, {
+            (0, quest_1.updatePlayerQuestProgressSync)(playerId, questSection, {
                 questId: questId,
                 finished: true,
                 clearRank: 5
@@ -69,7 +71,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Bad Request",
                 "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -102,7 +104,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Bad Request",
                 "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request",

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getRequestPlatformSync = exports.Platform = exports.generateDataHeaders = exports.generateViewerId = exports.generateIdpAlias = exports.getDateFromServerTime = exports.getServerTimeForPlayer = exports.getTimeOffset = exports.setServerTimeOffset = exports.setServerTime = exports.getServerDate = exports.getServerTime = void 0;
+exports.getRequestPlatformSync = exports.Platform = exports.generateDataHeaders = exports.generateViewerId = exports.generateIdpAlias = exports.getDateFromServerTime = exports.getServerTimeForPlayer = exports.getTimeOffset = exports.setServerTimeOffset = exports.setServerTime = exports.realToVirtual = exports.getServerDate = exports.getServerTime = void 0;
 const crypto_1 = require("crypto");
 // The server's current time offset (real time + offset = simulated time)
 let timeOffset = null; // milliseconds, null = use system time
@@ -29,6 +29,11 @@ function getServerDate() {
     return timeOffset !== null ? new Date(Date.now() + timeOffset) : new Date();
 }
 exports.getServerDate = getServerDate;
+/** Convert a real Date (as stored in DB) to virtual epoch seconds for client. */
+function realToVirtual(date) {
+    return Math.floor((date.getTime() + (timeOffset !== null && timeOffset !== void 0 ? timeOffset : 0)) / 1000);
+}
+exports.realToVirtual = realToVirtual;
 /**
  * Sets a custom server time from an absolute date.
  * The offset (target - real time) is computed and stored.

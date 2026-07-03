@@ -36,11 +36,14 @@ const expod_1 = __importDefault(require("./routes/api/expod"));
 const storyQuest_1 = __importDefault(require("./routes/api/storyQuest"));
 const option_1 = __importDefault(require("./routes/api/option"));
 const singleBattleQuest_1 = __importDefault(require("./routes/api/singleBattleQuest"));
-const multiBattleQuest_1 = __importDefault(require("./routes/api/multiBattleQuest"));
+const multi_1 = require("./multi");
 const attention_1 = __importDefault(require("./routes/api/attention"));
 const character_1 = __importDefault(require("./routes/api/character"));
+const mana_1 = __importDefault(require("./routes/api/character/mana"));
+const bond_1 = __importDefault(require("./routes/api/character/bond"));
 const partyGroup_1 = __importDefault(require("./routes/api/partyGroup"));
 const equipment_1 = __importDefault(require("./routes/api/equipment"));
+const sell_1 = __importDefault(require("./routes/api/sell"));
 const exBoost_1 = __importDefault(require("./routes/api/exBoost"));
 const boxGacha_1 = __importDefault(require("./routes/api/boxGacha"));
 const shop_1 = __importDefault(require("./routes/api/shop"));
@@ -49,6 +52,7 @@ const encyclopedia_1 = __importDefault(require("./routes/api/encyclopedia"));
 const mail_1 = __importDefault(require("./routes/api/mail"));
 const rankingEvent_1 = __importDefault(require("./routes/api/rankingEvent"));
 const mission_1 = __importDefault(require("./routes/api/mission"));
+const activeMission_1 = __importDefault(require("./routes/api/activeMission"));
 const payment_1 = __importDefault(require("./routes/api/payment"));
 const news_1 = __importDefault(require("./routes/api/news"));
 const raidEvent_1 = __importDefault(require("./routes/api/raidEvent"));
@@ -60,14 +64,52 @@ const history_1 = __importDefault(require("./routes/api/history"));
 const comic_1 = __importDefault(require("./routes/api/comic"));
 const questUnlock_1 = __importDefault(require("./routes/api/questUnlock"));
 const item_1 = __importDefault(require("./routes/api/item"));
-const sessionServer_1 = require("./data/sessionServer");
+const multi_2 = require("./multi");
 const fastify = (0, fastify_1.default)({
     logger: {
         level: "info"
-    }
+    },
+    bodyLimit: 262144 // 256KB — covers /single_battle_quest/finish large battle stats
 });
 // Restore saved time offset from active player on startup
 (0, activeAccount_1.restoreTimeOffset)();
+// Self-exit if the launcher (our parent) dies — so a crash/force-close of the launcher can't leave
+// this node process orphaned holding the ports. The launcher passes its PID via LAUNCHER_PID.
+// (process.kill(pid, 0) sends no signal; it just throws if that PID no longer exists.)
+const launcherPid = process.env.LAUNCHER_PID ? parseInt(process.env.LAUNCHER_PID) : 0;
+if (launcherPid > 0) {
+    setInterval(() => {
+        try {
+            process.kill(launcherPid, 0);
+        }
+        catch (_a) {
+            console.log("[launcher] parent process gone → exiting to free ports");
+            process.exit(0);
+        }
+    }, 5000).unref();
+}
+// Simple in-memory rate limiter for /crash endpoint only.
+// /debug is excluded — game client sends heavy beacon traffic during normal startup.
+const rateLimitMap = new Map();
+const RATE_LIMIT_MAX = 30;
+const RATE_LIMIT_WINDOW = 60000;
+fastify.addHook("onRequest", (request, reply) => __awaiter(void 0, void 0, void 0, function* () {
+    var _c, _d;
+    if (request.url === "/crash") {
+        const ip = ((_d = (_c = request.headers["x-forwarded-for"]) === null || _c === void 0 ? void 0 : _c.split(",")[0]) === null || _d === void 0 ? void 0 : _d.trim())
+            || request.ip;
+        const now = Date.now();
+        const entry = rateLimitMap.get(ip) || { count: 0, reset: now + RATE_LIMIT_WINDOW };
+        if (now > entry.reset) {
+            entry.count = 0;
+            entry.reset = now + RATE_LIMIT_WINDOW;
+        }
+        if (++entry.count > RATE_LIMIT_MAX) {
+            return reply.status(429).send("Too Many Requests");
+        }
+        rateLimitMap.set(ip, entry);
+    }
+}));
 /**
  * Walk a MsgPack buffer in a single pass. Replaces uint32 tags (0xCE) with
  * int32 (0xD2) for values < 2^31, and with float64 (0xCB) for values ≥ 2^31.
@@ -365,9 +407,9 @@ fastify.post(`${apiPrefix}/episode_trial_reading/finish`, (_request, reply) => _
     stubMsgpackReply(reply, {});
 }));
 fastify.get("/debug", (request, reply) => __awaiter(void 0, void 0, void 0, function* () {
-    var _c;
+    var _e;
     const ts = new Date().toISOString();
-    const loc = ((_c = request.query) === null || _c === void 0 ? void 0 : _c.loc) || "unknown";
+    const loc = ((_e = request.query) === null || _e === void 0 ? void 0 : _e.loc) || "unknown";
     // Parse C3032 from beacon query string (04e patch sends via CrashUtil.debugBeacon)
     try {
         parseC3032Beacon(loc);
@@ -448,9 +490,9 @@ function parsePlayBeacon(loc) {
     }
 }
 fastify.post("/debug", (request, reply) => __awaiter(void 0, void 0, void 0, function* () {
-    var _d;
+    var _f;
     const ts = new Date().toISOString();
-    const loc = ((_d = request.body) === null || _d === void 0 ? void 0 : _d.loc) || "unknown";
+    const loc = ((_f = request.body) === null || _f === void 0 ? void 0 : _f.loc) || "unknown";
     console.log(`[BEACON ${ts}] ${loc}`);
     // Parse C3032 beacons for auto-purification (04e patch skips throw but keeps beacon)
     try {
@@ -491,11 +533,14 @@ fastify.register(expod_1.default, { prefix: `${apiPrefix}/expod` });
 fastify.register(storyQuest_1.default, { prefix: `${apiPrefix}/story_quest` });
 fastify.register(option_1.default, { prefix: `${apiPrefix}/option` });
 fastify.register(singleBattleQuest_1.default, { prefix: `${apiPrefix}/single_battle_quest` });
-fastify.register(multiBattleQuest_1.default, { prefix: `${apiPrefix}/multi_battle_quest` });
+fastify.register(multi_1.multiBattleRoutes, { prefix: `${apiPrefix}/multi_battle_quest` });
 fastify.register(attention_1.default, { prefix: `${apiPrefix}/attention` });
 fastify.register(character_1.default, { prefix: `${apiPrefix}/character` });
+fastify.register(mana_1.default, { prefix: `${apiPrefix}/character` });
+fastify.register(bond_1.default, { prefix: `${apiPrefix}/character` });
 fastify.register(partyGroup_1.default, { prefix: `${apiPrefix}/party_group` });
 fastify.register(equipment_1.default, { prefix: `${apiPrefix}/equipment` });
+fastify.register(sell_1.default, { prefix: `${apiPrefix}/equipment` });
 fastify.register(exBoost_1.default, { prefix: `${apiPrefix}/ex_boost` });
 fastify.register(boxGacha_1.default, { prefix: `${apiPrefix}/box_gacha` });
 fastify.register(shop_1.default, { prefix: `${apiPrefix}/shop` });
@@ -504,6 +549,7 @@ fastify.register(encyclopedia_1.default, { prefix: `${apiPrefix}/encyclopedia` }
 fastify.register(mail_1.default, { prefix: `${apiPrefix}/mail` });
 fastify.register(rankingEvent_1.default, { prefix: `${apiPrefix}/ranking_event` });
 fastify.register(mission_1.default, { prefix: `${apiPrefix}/mission` });
+fastify.register(activeMission_1.default, { prefix: `${apiPrefix}/active_mission` });
 fastify.register(payment_1.default, { prefix: `${apiPrefix}/payment` });
 fastify.register(news_1.default, { prefix: `${apiPrefix}/news` });
 fastify.register(raidEvent_1.default, { prefix: `${apiPrefix}/event/raid` });
@@ -535,12 +581,34 @@ fastify.register(static_1.default, {
     prefix: "/public",
     decorateReply: false
 });
+// --- iOS Leiting SDK login mock (the REAL-SDK path; Android uses the dummy SDK and skips all this) ---
+// The iOS client can't be code-patched to sdkDummy (AOT), so it runs the real Leiting SDK login; we
+// answer those endpoints so it succeeds as a guest. IOS_SDK_LOGIN_BLOB = AES(#LeitingAESKey#!) of the
+// fixed guest UserBean (frida-proven decryptable by the iOS SDK). Any credential is accepted.
+const IOS_SDK_LOGIN_BLOB = "Ox8piDWnl7p3xCrJ3bwS8RSjUahG/oB4S8D+s39R7Bb/C7XfVkgxohfumfFMK/Or8Kppz+Bk/tZyrEHnERbc0NYeuBKFrcWdQ+gzSuuliP9kIb1uUBP9Uj0DxB49Pnr3MSs6FDp8SZXDvmPjKT8y0twAiSYGQu1GCUwpKT0uJH1zxb8Q6Zyj70UPLlRKPoKnsSRscBIlOj/ACkDy4cBCfAYFFTApjQY4+NnsddSYs40399y59OzTsKMGCuyghJeeBCeATZYeihAkkcj93Prd6YYI7jLYfUPDN4Rxlj5fx9d89ZKQcRE9GTophK7MWQdP6ihEfY49aUHvXXQjRlO3z+gAAhb2VPW8KHnmG/K0jds182SXYhY3EXqf9bPpbO8NqtYKOAx8lRQBO/h01yRP9vBITftZQ0PIee/27v4EsifUiNpGgZO0Z1nduxadLfZuScp+rsPO8LfXK9pc2LPq7Q86AuH80NfA7/zVnCzhvoOLf5G+KpyOtvlHnuVei76T0/clqHs2iBtrPv8vqlBxjeJo0g08dMbaZhYTsOrZv7Q0KSAd3lPrtI6EeB2PqNG1";
+const iosLoginOK = { status: "0", type: "0", message: "", data: IOS_SDK_LOGIN_BLOB };
+const iosStatusOK = { status: "0", statusCode: "0", memo: "", message: "", data: "" };
+const iosLoginPaths = ["/mobile!mobileLoginPubV2.action", "/login/mobile!mobileLoginPubV2.action", "/mobile!sdkLogin.action", "/login/mobile!sdkLogin.action", "/mobile!guestRegister.action", "/login/mobile!guestRegister.action", "/mobile!sdkCheckLogin.action", "/login/mobile!sdkCheckLogin.action", "/sdk/v3-3/code_login_v2.do", "/sdk/v3-3/code_login.do", "/sdk/v3-3/pwd_login.do", "/sdk/v3-3/check_login.do", "/sdk/v3-3/check_force.do", "/sdk/v3-3/taptap_login.do", "/sdk/auth_login.do", "/sdk/v3-3/auth_login.do"];
+const iosStubPaths = ["/mobile_two!getRegisterCodeOnly.action", "/login/mobile_two!getRegisterCodeOnly.action", "/aes/message/send_phone_code", "/aes/message/send_login_verify_code", "/aes/message/send_bind_phone_login_code", "/aes/message/send_register_code"];
+for (const p of iosLoginPaths)
+    fastify.all(p, (_req, reply) => { console.log("[iOS-SDK-LOGIN] " + p); reply.send(iosLoginOK); });
+for (const p of iosStubPaths)
+    fastify.all(p, (_req, reply) => { console.log("[iOS-SDK-STUB] " + p); reply.send(iosStatusOK); });
 // Catch-all to log unknown endpoints
 fastify.setNotFoundHandler((request, reply) => {
-    console.log(`[UNKNOWN] ${request.method} ${request.url}`);
+    // Log body+content-type for unmatched paths — used to capture the (AES) SDK login payloads
+    // so we can confirm the request format and build the leiting SDK login mock.
+    let bodyStr = "";
+    try {
+        if (request.body !== undefined && request.body !== null)
+            bodyStr = typeof request.body === "string" ? request.body : JSON.stringify(request.body);
+    }
+    catch (e) { }
+    const ct = request.headers["content-type"] || "";
+    console.log(`[UNKNOWN] ${request.method} ${request.url}${bodyStr ? `  ct=${ct}  body=${bodyStr.slice(0, 400)}` : ""}`);
     reply.status(404).send({ error: "Not Found" });
 });
-const host = (_a = process.env.CN_LISTEN_HOST) !== null && _a !== void 0 ? _a : "0.0.0.0";
+const host = (_a = process.env.CN_LISTEN_HOST) !== null && _a !== void 0 ? _a : "127.0.0.1";
 const port = parseInt((_b = process.env.CN_LISTEN_PORT) !== null && _b !== void 0 ? _b : "8001");
 fastify.listen({ port, host }, (err, address) => {
     if (err) {
@@ -549,5 +617,5 @@ fastify.listen({ port, host }, (err, address) => {
     }
     console.log(`CN StarPoint listening on http://${host}:${port}`);
     // Start multi battle TCP session server
-    (0, sessionServer_1.startSessionServer)();
+    (0, multi_2.startSessionServer)();
 });

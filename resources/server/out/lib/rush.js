@@ -2,7 +2,8 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getRushEventEndlessBattleRankPlayedPartyListSync = exports.getPlayerRushEventEndlessBattleRankingSync = exports.getSerializedPlayerRushEventPlayedPartiesSync = void 0;
 const types_1 = require("../data/types");
-const wdfpData_1 = require("../data/wdfpData");
+const rushEvent_1 = require("../data/domains/rushEvent");
+const player_1 = require("../data/domains/player");
 /**
  * Gets all of a player's played parties, serializes them into client formant, and organizes them by their RushEventBattleType.
  *
@@ -12,13 +13,13 @@ const wdfpData_1 = require("../data/wdfpData");
  */
 function getSerializedPlayerRushEventPlayedPartiesSync(playerId, eventId) {
     // get played parties
-    const playedParties = (0, wdfpData_1.getPlayerRushEventPlayedPartiesSync)(playerId, eventId);
+    const playedParties = (0, rushEvent_1.getPlayerRushEventPlayedPartiesSync)(playerId, eventId);
     // convert played parties to the expected client format
     const rushBattlePlayedPartyList = {};
     const endlessBattlePlayedPartyList = {};
     for (const party of playedParties) {
         const record = party.battleType === types_1.RushEventBattleType.FOLDER ? rushBattlePlayedPartyList : endlessBattlePlayedPartyList;
-        record[party.round] = (0, wdfpData_1.serializePlayerRushEventPlayedParty)(party);
+        record[party.round] = (0, rushEvent_1.serializePlayerRushEventPlayedParty)(party);
     }
     // return parties
     return {
@@ -37,10 +38,10 @@ exports.getSerializedPlayerRushEventPlayedPartiesSync = getSerializedPlayerRushE
  */
 function getPlayerRushEventEndlessBattleRankingSync(playerId, eventId, useData) {
     var _a, _b;
-    const playerData = (useData === null || useData === void 0 ? void 0 : useData.playerData) === undefined ? (0, wdfpData_1.getPlayerSync)(playerId) : useData === null || useData === void 0 ? void 0 : useData.playerData;
+    const playerData = (useData === null || useData === void 0 ? void 0 : useData.playerData) === undefined ? (0, player_1.getPlayerSync)(playerId) : useData === null || useData === void 0 ? void 0 : useData.playerData;
     if (playerData === null)
         return null;
-    const rushEventData = (useData === null || useData === void 0 ? void 0 : useData.rushEventData) === undefined ? (0, wdfpData_1.getPlayerRushEventSync)(playerId, eventId) : useData === null || useData === void 0 ? void 0 : useData.rushEventData;
+    const rushEventData = (useData === null || useData === void 0 ? void 0 : useData.rushEventData) === undefined ? (0, rushEvent_1.getPlayerRushEventSync)(playerId, eventId) : useData === null || useData === void 0 ? void 0 : useData.rushEventData;
     if (rushEventData === null)
         return null;
     const bestRound = rushEventData.endlessBattleMaxRound;
@@ -79,7 +80,7 @@ exports.getPlayerRushEventEndlessBattleRankingSync = getPlayerRushEventEndlessBa
  */
 function getRushEventEndlessBattleRankPlayedPartyListSync(rank, eventId) {
     // Get the ID of the player who is currently at rank [rank].
-    const playerId = (0, wdfpData_1.getPlayerIdFromRushEventEndlessRankSync)(rank, eventId);
+    const playerId = (0, rushEvent_1.getPlayerIdFromRushEventEndlessRankSync)(rank, eventId);
     if (playerId === null)
         return null;
     // get the played party list

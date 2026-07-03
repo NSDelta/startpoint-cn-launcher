@@ -12,10 +12,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const wdfpData_1 = require("../../data/wdfpData");
+const item_1 = require("../../data/domains/item");
+const player_1 = require("../../data/domains/player");
+const session_1 = require("../../data/domains/session");
 const activeAccount_1 = require("../../data/activeAccount");
 const assets_1 = require("../../lib/assets");
 const utils_1 = require("../../utils");
+const item_sell_1 = require("../../lib/item-sell");
+const stamina_1 = require("../../lib/stamina");
 const item_data_json_1 = __importDefault(require("../../../assets/item_data.json"));
 const ITEM_EFFECTS = item_data_json_1.default;
 const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
@@ -27,17 +31,16 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             console.warn('[ITEM-USE] invalid request body');
             return reply.status(400).send({ "error": "Bad Request", "message": "Invalid request body." });
         }
-        const session = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const session = yield (0, session_1.getSession)(viewerId.toString());
         if (!session)
             return reply.status(400).send({ "error": "Bad Request", "message": "Invalid viewer id." });
         const playerId = (0, activeAccount_1.resolvePlayerIdSync)(session.accountId);
         if (!playerId)
             return reply.status(500).send({ "error": "Internal Server Error", "message": "No player bound to account." });
-        const player = (0, wdfpData_1.getPlayerSync)(playerId);
+        const player = (0, player_1.getPlayerSync)(playerId);
         if (!player)
             return reply.status(500).send({ "error": "Internal Server Error", "message": "Player not found." });
         const config = (0, assets_1.getConfigSync)();
-        const recoverySeconds = config.stamina_recovery_seconds;
         const maxOverflow = config.max_stamina_overflow;
         let totalStaminaRecovery = 0;
         const itemUpdates = [];
@@ -65,7 +68,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 continue;
             }
             // Verify ownership
-            const currentCount = (_a = (0, wdfpData_1.getPlayerItemSync)(playerId, itemId)) !== null && _a !== void 0 ? _a : 0;
+            const currentCount = (_a = (0, item_1.getPlayerItemSync)(playerId, itemId)) !== null && _a !== void 0 ? _a : 0;
             if (currentCount < requestCount) {
                 console.warn(`[ITEM-USE] player ${playerId} has ${currentCount} of item ${itemId}, requested ${requestCount}`);
                 return reply.status(400).send({ "error": "Bad Request", "message": "Insufficient items." });
@@ -96,11 +99,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             console.warn(`[ITEM-USE] zero total recovery`);
             return reply.status(400).send({ "error": "Bad Request", "message": "Zero recovery." });
         }
-        // Compute real-time stamina
-        const staminaHealTimeSec = player.staminaHealTime.getTime() / 1000;
-        const nowSec = Math.floor(Date.now() / 1000);
-        const elapsed = (nowSec - staminaHealTimeSec) / recoverySeconds;
-        const currentStamina = Math.min(Math.max(0, player.stamina + Math.floor(elapsed)), maxOverflow);
+        const currentStamina = (0, stamina_1.computeRealTimeStamina)(player);
         if (currentStamina >= maxOverflow) {
             console.log(`[ITEM-USE] player ${playerId} already at max stamina (${currentStamina} >= ${maxOverflow})`);
             return reply.status(400).send({ "error": "Bad Request", "code": 2102, "message": "Already at max stamina." });
@@ -108,9 +107,9 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
         const afterStamina = Math.min(currentStamina + totalStaminaRecovery, maxOverflow);
         // Batch update
         for (const upd of itemUpdates) {
-            (0, wdfpData_1.updatePlayerItemSync)(playerId, upd.id, upd.newCount);
+            (0, item_1.updatePlayerItemSync)(playerId, upd.id, upd.newCount);
         }
-        (0, wdfpData_1.updatePlayerSync)({
+        (0, player_1.updatePlayerSync)({
             id: playerId,
             stamina: afterStamina,
             staminaHealTime: new Date()
@@ -127,9 +126,41 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
             "data": {
                 "user_info": {
                     "stamina": afterStamina,
-                    "stamina_heal_time": (0, utils_1.getServerTime)()
+                    "stamina_heal_time": (0, utils_1.realToVirtual)(new Date())
                 },
                 "item_list": itemListMap
+            }
+        });
+    }));
+    // ── sell (sell items/ability souls for mana) ────────────────────────
+    fastify.post("/sell", (request, reply) => __awaiter(void 0, void 0, void 0, function* () {
+        const body = request.body;
+        const viewerId = body.viewer_id;
+        const itemId = body.item_id;
+        const sellNumber = body.sell_number;
+        if (!viewerId || isNaN(viewerId) || !itemId || isNaN(itemId) || !sellNumber || isNaN(sellNumber)) {
+            return reply.status(400).send({ "error": "Bad Request", "message": "Invalid request body." });
+        }
+        const session = yield (0, session_1.getSession)(viewerId.toString());
+        if (!session)
+            return reply.status(400).send({ "error": "Bad Request", "message": "Invalid viewer id." });
+        const accountId = session.accountId;
+        const playerId = (0, activeAccount_1.resolvePlayerIdSync)(accountId);
+        if (!playerId)
+            return reply.status(500).send({ "error": "Internal Server Error", "message": "No player bound to account." });
+        const result = (0, item_sell_1.sellItemSync)(playerId, itemId, sellNumber);
+        if (!result.ok) {
+            const code = 'errorCode' in result ? result.errorCode : undefined;
+            return reply.status(400).send({ "error": "Bad Request", "code": code, "message": result.error });
+        }
+        console.log(`[ITEM_SELL] account=${accountId} player=${playerId}: item ${itemId} ×${sellNumber} sold, mana +${result.manaGained} (${result.freeMana - result.manaGained} -> ${result.freeMana})`);
+        reply.header("content-type", "application/x-msgpack");
+        return reply.status(200).send({
+            "data_headers": (0, utils_1.generateDataHeaders)({ viewer_id: viewerId }),
+            "data": {
+                "item_list": { [itemId]: result.newCount },
+                "user_info": { "free_mana": result.freeMana },
+                "mail_arrived": false
             }
         });
     }));

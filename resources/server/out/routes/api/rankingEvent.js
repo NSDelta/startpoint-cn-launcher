@@ -10,7 +10,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const wdfpData_1 = require("../../data/wdfpData");
+const quest_1 = require("../../data/domains/quest");
+const session_1 = require("../../data/domains/session");
 const utils_1 = require("../../utils");
 const types_1 = require("../../lib/types");
 const activeAccount_1 = require("../../data/activeAccount");
@@ -45,7 +46,7 @@ function getRankingSummary(playerId, eventId) {
         return null;
     const topTime = (_a = rankingEventTopTimesMs[eventId]) !== null && _a !== void 0 ? _a : 0;
     // get data for the ranking quest
-    const playerQuestData = (0, wdfpData_1.getPlayerSingleQuestProgressSync)(playerId, types_1.QuestCategory.RANKING_EVENT_SINGLE, questId);
+    const playerQuestData = (0, quest_1.getPlayerSingleQuestProgressSync)(playerId, types_1.QuestCategory.RANKING_EVENT_SINGLE, questId);
     const isAccomplished = playerQuestData !== null && playerQuestData.bestElapsedTimeMs !== undefined && playerQuestData.bestElapsedTimeMs !== null;
     return {
         "best_record": {
@@ -73,7 +74,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Bad Request",
                 "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -110,7 +111,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 "error": "Bad Request",
                 "message": "Invalid request body."
             });
-        const viewerIdSession = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const viewerIdSession = yield (0, session_1.getSession)(viewerId.toString());
         if (!viewerIdSession)
             return reply.status(400).send({
                 "error": "Bad Request",

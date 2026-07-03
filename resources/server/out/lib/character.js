@@ -2,7 +2,9 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getCharactersEvolutionImgLevels = exports.givePlayerCharactersExpSync = exports.givePlayerCharacterSync = exports.characterExpCaps = void 0;
 const utils_1 = require("../data/utils");
-const wdfpData_1 = require("../data/wdfpData");
+const character_1 = require("../data/domains/character");
+const player_1 = require("../data/domains/player");
+const item_1 = require("../data/domains/item");
 const assets_1 = require("./assets");
 const types_1 = require("./types");
 exports.characterExpCaps = {
@@ -101,7 +103,7 @@ function givePlayerCharacterSync(playerId, characterId) {
     if (assetData === null)
         return null;
     // get the current character data
-    const playerCharacter = (0, wdfpData_1.getPlayerCharacterSync)(playerId, characterId);
+    const playerCharacter = (0, character_1.getPlayerCharacterSync)(playerId, characterId);
     if (playerCharacter === null) {
         const bondTokenList = [
             {
@@ -119,7 +121,7 @@ function givePlayerCharacterSync(playerId, characterId) {
         }
         // give the player the character
         const joinTime = new Date();
-        (0, wdfpData_1.insertPlayerCharacterSync)(playerId, characterId, {
+        (0, character_1.insertPlayerCharacterSync)(playerId, characterId, {
             entryCount: 1,
             evolutionLevel: 0,
             overLimitStep: 0,
@@ -158,7 +160,7 @@ function givePlayerCharacterSync(playerId, characterId) {
         let returnItem = undefined;
         if (dupeRewards) {
             const itemId = dupeRewards[assetData.element];
-            (0, wdfpData_1.givePlayerItemSync)(playerId, itemId, 1);
+            (0, item_1.givePlayerItemSync)(playerId, itemId, 1);
             returnItem = {
                 id: itemId,
                 count: 1
@@ -166,7 +168,7 @@ function givePlayerCharacterSync(playerId, characterId) {
         }
         // update stack
         const newStack = playerCharacter.stack + 1;
-        (0, wdfpData_1.updatePlayerCharacterSync)(playerId, characterId, {
+        (0, character_1.updatePlayerCharacterSync)(playerId, characterId, {
             stack: newStack
         });
         return {
@@ -196,7 +198,7 @@ function givePlayerCharactersExpSync(playerId, characterIds, expAmount, ignoreUp
     const bondTokenStatusList = {};
     let addToExpPool = 0;
     for (const characterId of characterIds) {
-        const characterData = (0, wdfpData_1.getPlayerCharacterSync)(playerId, characterId);
+        const characterData = (0, character_1.getPlayerCharacterSync)(playerId, characterId);
         const assetData = (0, assets_1.getCharacterDataSync)(characterId);
         if ((characterData !== null) && (assetData !== null) && !ignoreUpdate) {
             const expCap = exports.characterExpCaps[assetData.rarity][characterData.overLimitStep] || Number.MAX_SAFE_INTEGER;
@@ -205,7 +207,7 @@ function givePlayerCharactersExpSync(playerId, characterIds, expAmount, ignoreUp
             const overflowExp = afterExp > expCap ? afterExp - expCap : 0;
             addToExpPool += overflowExp;
             afterExp = Math.min(expCap, afterExp);
-            (0, wdfpData_1.updatePlayerCharacterSync)(playerId, characterId, {
+            (0, character_1.updatePlayerCharacterSync)(playerId, characterId, {
                 exp: afterExp
             });
             addExpList.push({
@@ -253,11 +255,11 @@ function givePlayerCharactersExpSync(playerId, characterIds, expAmount, ignoreUp
         }
     }
     // get player data
-    const playerData = (0, wdfpData_1.getPlayerSync)(playerId);
+    const playerData = (0, player_1.getPlayerSync)(playerId);
     const currentExpPool = playerData ? playerData.expPool : null;
     const afterExpPool = currentExpPool === null ? null : currentExpPool + addToExpPool;
     if (afterExpPool !== null && addToExpPool > 0) {
-        (0, wdfpData_1.updatePlayerSync)({
+        (0, player_1.updatePlayerSync)({
             id: playerId,
             expPool: afterExpPool
         });
@@ -282,7 +284,7 @@ function getCharactersEvolutionImgLevels(playerId, characterIds) {
     const evolutionImgLevels = [];
     for (const id of characterIds) {
         if (id !== null) {
-            const character = (0, wdfpData_1.getPlayerCharacterSync)(playerId, id);
+            const character = (0, character_1.getPlayerCharacterSync)(playerId, id);
             const illustrationSettings = (_a = character === null || character === void 0 ? void 0 : character.illustrationSettings) !== null && _a !== void 0 ? _a : [null];
             const evolutionLevel = (_b = character === null || character === void 0 ? void 0 : character.evolutionLevel) !== null && _b !== void 0 ? _b : 0;
             evolutionImgLevels.push(illustrationSettings[0] === null ? evolutionLevel : illustrationSettings[0]);

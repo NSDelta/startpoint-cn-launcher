@@ -9,7 +9,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const wdfpData_1 = require("../../data/wdfpData");
+const mail_1 = require("../../data/domains/mail");
+const session_1 = require("../../data/domains/session");
 const activeAccount_1 = require("../../data/activeAccount");
 const utils_1 = require("../../utils");
 const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
@@ -21,7 +22,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 error: "Bad Request",
                 message: "Invalid request body."
             });
-        const session = yield (0, wdfpData_1.getSession)(viewerId.toString());
+        const session = yield (0, session_1.getSession)(viewerId.toString());
         if (!session)
             return reply.status(400).send({
                 error: "Bad Request",
@@ -33,7 +34,7 @@ const routes = (fastify) => __awaiter(void 0, void 0, void 0, function* () {
                 error: "Bad Request",
                 message: "No player bound to account."
             });
-        const records = (0, wdfpData_1.getReceiveHistorySync)(playerId, 7, 500);
+        const records = (0, mail_1.getReceiveHistorySync)(playerId, 7, 500);
         const history = records.map(r => ({
             create_time: r.create_time,
             description: null,
