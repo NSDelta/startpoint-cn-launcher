@@ -25,6 +25,63 @@
 import { existsSync, readFileSync, writeFileSync, copyFileSync, mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { deflateRawSync, inflateRawSync } from 'node:zlib';
+
+// ── Minimal, dependency-free ZIP engine ───────────────────────────────────────
+// The old repack used the bundled JDK `jar`; `jar uf0` rewrote the Mach-O entry as
+// STORED with a FAT/MSDOS host and DROPPED the Unix exec-permission bit. Sideloadly
+// tolerates that, but AltStore/AltServer's stricter IPA parser rejects it outright with
+// "The app is in an invalid format." This engine rebuilds the archive preserving every
+// untouched entry's raw compressed bytes + attributes VERBATIM, and re-deflates only the
+// patched Mach-O while KEEPING its original externalAttr/versionMadeBy (host=osx,
+// rwxr-xr-x) — so the repacked IPA installs on BOTH Sideloadly and AltStore.
+const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(b) { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+function readZip(buf) {
+  let eocd = -1;
+  for (let i = buf.length - 22; i >= 0 && i > buf.length - 22 - 65536; i--) { if (buf.readUInt32LE(i) === 0x06054b50) { eocd = i; break; } }
+  if (eocd < 0) throw new Error('ZIP EOCD not found');
+  const total = buf.readUInt16LE(eocd + 10); let cd = buf.readUInt32LE(eocd + 16); const entries = [];
+  for (let n = 0; n < total; n++) {
+    if (buf.readUInt32LE(cd) !== 0x02014b50) throw new Error('bad central dir @' + cd);
+    const versionMadeBy = buf.readUInt16LE(cd + 4), method = buf.readUInt16LE(cd + 10);
+    const mtime = buf.readUInt16LE(cd + 12), mdate = buf.readUInt16LE(cd + 14);
+    const crc = buf.readUInt32LE(cd + 16), csize = buf.readUInt32LE(cd + 20), usize = buf.readUInt32LE(cd + 24);
+    const nameLen = buf.readUInt16LE(cd + 28), extraLen = buf.readUInt16LE(cd + 30), commentLen = buf.readUInt16LE(cd + 32);
+    const externalAttr = buf.readUInt32LE(cd + 38), lho = buf.readUInt32LE(cd + 42);
+    const name = buf.toString('latin1', cd + 46, cd + 46 + nameLen);
+    const lnameLen = buf.readUInt16LE(lho + 26), lextraLen = buf.readUInt16LE(lho + 28);
+    const dataStart = lho + 30 + lnameLen + lextraLen;
+    entries.push({ name, method, mtime, mdate, crc, csize, usize, versionMadeBy, externalAttr, cdata: buf.subarray(dataStart, dataStart + csize) });
+    cd += 46 + nameLen + extraLen + commentLen;
+  }
+  return entries;
+}
+function writeZip(entries) {
+  const locals = [], centrals = []; let offset = 0;
+  for (const e of entries) {
+    const name = Buffer.from(e.name, 'latin1');
+    const lh = Buffer.alloc(30);
+    lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt16LE(0, 6);
+    lh.writeUInt16LE(e.method, 8); lh.writeUInt16LE(e.mtime, 10); lh.writeUInt16LE(e.mdate, 12);
+    lh.writeUInt32LE(e.crc, 14); lh.writeUInt32LE(e.csize, 18); lh.writeUInt32LE(e.usize, 22);
+    lh.writeUInt16LE(name.length, 26); lh.writeUInt16LE(0, 28);
+    locals.push(lh, name, e.cdata);
+    const ch = Buffer.alloc(46);
+    ch.writeUInt32LE(0x02014b50, 0); ch.writeUInt16LE(e.versionMadeBy, 4); ch.writeUInt16LE(20, 6);
+    ch.writeUInt16LE(0, 8); ch.writeUInt16LE(e.method, 10); ch.writeUInt16LE(e.mtime, 12); ch.writeUInt16LE(e.mdate, 14);
+    ch.writeUInt32LE(e.crc, 16); ch.writeUInt32LE(e.csize, 20); ch.writeUInt32LE(e.usize, 24);
+    ch.writeUInt16LE(name.length, 28); ch.writeUInt16LE(0, 30); ch.writeUInt16LE(0, 32);
+    ch.writeUInt16LE(0, 34); ch.writeUInt16LE(0, 36); ch.writeUInt32LE(e.externalAttr, 38); ch.writeUInt32LE(offset, 42);
+    centrals.push(ch, name);
+    offset += 30 + name.length + e.cdata.length;
+  }
+  const localBuf = Buffer.concat(locals), centralBuf = Buffer.concat(centrals);
+  const eocd = Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50, 0); eocd.writeUInt16LE(entries.length, 8); eocd.writeUInt16LE(entries.length, 10);
+  eocd.writeUInt32LE(centralBuf.length, 12); eocd.writeUInt32LE(localBuf.length, 16);
+  return Buffer.concat([localBuf, centralBuf, eocd]);
+}
 
 const args = Object.fromEntries(process.argv.slice(2).map(a => {
   const m = a.match(/^--([^=]+)=(.*)$/); return m ? [m[1], m[2]] : [a.replace(/^--/, ''), true];
@@ -275,27 +332,21 @@ if (args.bin) {
   if (r.skipped.length) console.log(`skipped (too long, ${r.skipped.length}): ` + r.skipped.slice(0, 12).join(', '));
   console.log('DONE ' + OUT);
 } else {
-  // full IPA mode: copy IPA -> jar x the Mach-O -> patch -> jar uf0 back (store).
-  // Mirrors patch-apk.mjs (uses the launcher's bundled JDK `jar`). cwd must be the
-  // dir holding the relative entry path so jar updates the right entry.
-  const { execFileSync } = await import('node:child_process');
-  const TOTAL = 4; let step = 0;
+  // full IPA mode: pure-Node zip surgery — no external tools (no JDK `jar`). Read the IPA,
+  // inflate the one Mach-O entry, patch it, re-deflate, and rebuild the archive keeping every
+  // other entry's raw compressed bytes + attributes VERBATIM. The patched Mach-O re-uses its
+  // ORIGINAL entry attributes (host=osx, rwxr-xr-x), so the exec bit survives — this is what
+  // makes the result install on AltStore (jar's STORED/FAT/no-exec-bit output did not; see the
+  // ZIP-engine note near the top of this file).
+  const TOTAL = 3; let step = 0;
   const progress = (label) => console.log(`STEP ${++step}/${TOTAL} ${label}`);
-  const RES = args.res || path.join(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..', 'resources');
-  const JAR = args.jar || path.join(RES, 'jdk', 'bin', 'jar.exe');
-  if (!existsSync(JAR)) fail(`找不到 jar.exe：${JAR}(用 --jar= 指定)`);
-  const WORK = args.work || path.join(os.tmpdir(), 'wf-ipa-patch');
-  rmSync(WORK, { recursive: true, force: true }); mkdirSync(WORK, { recursive: true });
-  progress('複製 IPA');
-  const ipaCopy = path.join(WORK, 'in.ipa');
-  copyFileSync(args.ipa, ipaCopy);                                   // ASCII work path
-  progress('解出原生二進位');
-  const ex = path.join(WORK, 'ex'); mkdirSync(ex, { recursive: true });
-  execFileSync(JAR, ['xf', ipaCopy, MACHO_REL], { cwd: ex });
-  const binPath = path.join(ex, MACHO_REL);
-  if (!existsSync(binPath)) fail('IPA 內找不到 Mach-O：' + MACHO_REL);
+  progress('讀取 IPA');
+  const zbuf = readFileSync(args.ipa);
+  const entries = readZip(zbuf);
+  const exe = entries.find(e => e.name === MACHO_REL);
+  if (!exe) fail('IPA 內找不到 Mach-O：' + MACHO_REL);
   progress('改寫端點 URL + 解除防重簽 guard');
-  const buf = readFileSync(binPath);
+  const buf = exe.method === 8 ? inflateRawSync(exe.cdata) : Buffer.from(exe.cdata);
   const r = patchBuffer(buf);
   const blk = patchBlock(buf);
   const guards = deguardBuffer(buf, GUARD_MODE);
@@ -309,13 +360,13 @@ if (args.bin) {
   console.log(wel === 3 ? '  suppressed 欢迎入园 welcome banner (LTLoginManager showWelcomeView: + 2 extra, 3/3)' : `  [!] welcome-banner patch only ${wel}/3 sites matched — skipped`);
   console.log(agr===0 ? '  agreement dialogs LEFT INTACT (default; use --agreement / --privacy to strip)' : ('  skipped 使用许可协议 EULA' + (agr>=3 ? ' + 隐私政策 popup' : '') + ` [${agr} site(s)]`));
   if (args['crash-longjmp'] && buf.readUInt32LE(0x57d834c) === 0xb0005190) { buf.writeUInt32LE(0xd4200000, 0x57d834c); console.log('  [diag] _longjmp stub -> BRK (AS3 throws now crash -> .ips backtrace = throw site)'); }
-  writeFileSync(binPath, buf);
   console.log(`patched ${r.patched} URL constants -> ${TARGET}`);
   console.log(`neutralized ${guards} deliberate-abort guards (0xDEADBEEF null-write)`);
   if (r.skipped.length) console.log(`skipped (${r.skipped.length} non-critical, too short): ` + r.skipped.slice(0, 8).join(', '));
   progress('重組 IPA');
-  copyFileSync(ipaCopy, OUT);
-  execFileSync(JAR, ['uf0', path.resolve(OUT), MACHO_REL], { cwd: ex });  // replace entry, stored
-  rmSync(WORK, { recursive: true, force: true });
-  console.log(`DONE ${OUT}  (host=${HOST}:${PORT}; 重簽: Sideloadly 用你的 Apple ID 安裝時會重新簽名 patch 後的二進位)`);
+  const def = deflateRawSync(buf, { level: 6 });          // re-deflate the patched Mach-O
+  exe.method = 8; exe.usize = buf.length; exe.csize = def.length; exe.crc = crc32(buf); exe.cdata = def;
+  // exe.externalAttr / exe.versionMadeBy are kept from the original entry → Unix host + rwxr-xr-x preserved.
+  writeFileSync(OUT, writeZip(entries));
+  console.log(`DONE ${OUT}  (host=${HOST}:${PORT}; 重簽: Sideloadly / AltStore 用你的 Apple ID 安裝時會重新簽名 patch 後的二進位)`);
 }
